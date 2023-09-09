@@ -136,7 +136,7 @@ def main(args):
     
     dataset = []
     files = 0
-    for n in range(1, 46):
+    for n in range(1, 3):
         for j in range(0, 10):
             for filepath in glob.iglob(args.data_path + '/physionet/WFDBRecords/' + f"{n:02}" +  '/' + f"{n:02}" + str(j) +  '/*.hea'):
                 try:
@@ -201,10 +201,17 @@ def main(args):
     loss_scaler = NativeScaler()
 
     misc.load_model(args=args, model_without_ddp=model_without_ddp, optimizer=optimizer, loss_scaler=loss_scaler)
-
+    
     print(f"Start training for {args.epochs} epochs")
     start_time = time.time()
-    for epoch in range(args.start_epoch, args.epochs):
+
+    # if args.resume != '':
+    #     checkpoint = torch.load("output_dir/checkpoint-" + str(args.start_epoch) + ".pth")
+    #     model.load_state_dict(checkpoint['model'])
+    #     epoch = checkpoint['epoch']
+
+    start = args.start_epoch
+    for epoch in range(start, args.epochs):
         train_stats = train_one_epoch(
             model, data_loader_train,
             optimizer, device, epoch, loss_scaler,
