@@ -28,9 +28,7 @@ import torch.backends.cudnn as cudnn
 # from torch.utils.tensorboard import SummaryWriter
 import torchvision.transforms as transforms
 import torchvision.datasets as datasets
-
 import timm
-
 # assert timm.__version__ == "0.3.2"  # version check
 import timm.optim.optim_factory as optim_factory
 
@@ -134,9 +132,11 @@ def main(args):
     #         transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])])
     # # dataset_train = datasets.ImageFolder(os.path.join(args.data_path, 'train'), transform=transform_train)
     
+    # Physionet Dataset  - change range n from (1, 46) to the number of folders you need
+    
     dataset = []
     files = 0
-    for n in range(1, 3):
+    for n in range(1, 46):
         for j in range(0, 10):
             for filepath in glob.iglob(args.data_path + '/physionet/WFDBRecords/' + f"{n:02}" +  '/' + f"{n:02}" + str(j) +  '/*.hea'):
                 try:
@@ -157,7 +157,7 @@ def main(args):
     print(dataset.shape)
     dataset = dataset.astype(np.double, copy=False)
     print(dataset.shape)
-    X = torch.from_numpy(dataset[:, :1000, :])
+    X = torch.from_numpy(dataset[:, :, :])
     print(X.shape)
     # X = X.permute(0, 2, 1)
     X = X[:, None, :, :]
