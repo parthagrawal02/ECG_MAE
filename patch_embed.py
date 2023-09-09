@@ -63,10 +63,10 @@ class PatchEmbed(nn.Module):
         self.strict_img_size = strict_img_size
         self.dynamic_img_pad = dynamic_img_pad
         self.proj1 = nn.Conv1d(1, 32, kernel_size=15, stride=1,padding= 'same', bias=bias)
-        self.proj2 = nn.Conv1d(32, 64, kernel_size=7, stride=1,padding= 'same', bias=bias)
-        self.proj = nn.Conv1d(64, embed_dim, kernel_size=50, stride=50, bias=bias)
         self.norm32 = nn.BatchNorm1d(32)
+        self.proj2 = nn.Conv1d(32, 64, kernel_size=7, stride=1,padding= 'same', bias=bias)
         self.norm64 = nn.BatchNorm1d(64)
+        self.proj = nn.Conv1d(64, embed_dim, kernel_size=50, stride=50, bias=bias)
 
     
     def forward(self, x):

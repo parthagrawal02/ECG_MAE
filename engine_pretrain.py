@@ -8,6 +8,7 @@
 # DeiT: https://github.com/facebookresearch/deit
 # BEiT: https://github.com/microsoft/unilm/tree/master/beit
 # --------------------------------------------------------
+
 import math
 import sys
 from typing import Iterable
@@ -41,13 +42,13 @@ def train_one_epoch(model: torch.nn.Module,
         # we use a per iteration (instead of per epoch) lr scheduler
         if data_iter_step % accum_iter == 0:
             lr_sched.adjust_learning_rate(optimizer, data_iter_step / len(data_loader) + epoch, args)
-
+        print("hello" + str(samples.shape))
         loss, _, _ = model(samples, mask_ratio=args.mask_ratio)
 
         loss_value = loss.item()
 
         # if not math.isfinite(loss_value):
-        #     print("Loss is {}, stopping training".format(loss_value))
+        #     print("Loss is {}, stopping training".fwormat(loss_value))
         #     sys.exit(1)
 
         loss /= accum_iter

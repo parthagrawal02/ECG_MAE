@@ -16,6 +16,13 @@ import os
 import time
 from pathlib import Path
 
+import torch.nn.functional as F
+import wfdb
+from wfdb import processing
+import re
+from os.path import exists
+import glob
+
 import torch
 import torch.backends.cudnn as cudnn
 # from torch.utils.tensorboard import SummaryWriter
@@ -35,18 +42,11 @@ import models_mae
 from engine_pretrain import train_one_epoch
 
 
-seq_length = 1000
-
-patch_size = (1, 50)
-embed_dim = 128
-
-x = torch.randn(10000, 1, 12, seq_length) 
-
 def get_args_parser():
     parser = argparse.ArgumentParser('MAE pre-training', add_help=False)
     parser.add_argument('--batch_size', default=64, type=int,
                         help='Batch size per GPU (effective batch size is batch_size * accum_iter * # gpus')
-    parser.add_argument('--epochs', default=10, type=int)
+    parser.add_argument('--epochs', default=800, type=int)
     parser.add_argument('--accum_iter', default=1, type=int,
                         help='Accumulate gradient iterations (for increasing the effective batch size under memory constraints)')
 
@@ -62,7 +62,7 @@ def get_args_parser():
 
     parser.add_argument('--norm_pix_loss', action='store_true',
                         help='Use (per-patch) normalized pixels as targets for computing loss')
-    parser.set_defaults(norm_pix_loss=False)
+    parser.set_defaults(norm_pix_loss=True)
 
     # Optimizer parameters
     parser.add_argument('--weight_decay', type=float, default=0.05,
@@ -79,7 +79,7 @@ def get_args_parser():
                         help='epochs to warmup LR')
 
     # Dataset parameters
-    parser.add_argument('--data_path', default='/datasets01/', type=str,
+    parser.add_argument('--data_path', default='/Users/parthagrawal02/Desktop/Carelog/ECG_CNN', type=str,
                         help='dataset path')
 
     parser.add_argument('--output_dir', default='./output_dir',
@@ -126,16 +126,45 @@ def main(args):
 
     cudnn.benchmark = False
 
-    # simple augmentation
-    transform_train = transforms.Compose([
-            transforms.RandomResizedCrop(args.input_size, scale=(0.2, 1.0), interpolation=3),  # 3 is bicubic
-            transforms.RandomHorizontalFlip(),
-            transforms.ToTensor(),
-            transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])])
-    # dataset_train = datasets.ImageFolder(os.path.join(args.data_path, 'train'), transform=transform_train)
-    dataset_train = x
+    # # simple augmentation
+    # transform_train = transforms.Compose([
+    #         transforms.RandomResizedCrop(args.input_size, scale=(0.2, 1.0), interpolation=3),  # 3 is bicubic
+    #         transforms.RandomHorizontalFlip(),
+    #         transforms.ToTensor(),
+    #         transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])])
+    # # dataset_train = datasets.ImageFolder(os.path.join(args.data_path, 'train'), transform=transform_train)
+    
+    dataset = []
+    files = 0
+    for n in range(1, 46):
+        for j in range(0, 10):
+            for filepath in glob.iglob(args.data_path + '/physionet/WFDBRecords/' + f"{n:02}" +  '/' + f"{n:02}" + str(j) +  '/*.hea'):
+                try:
+                    ecg_record = wfdb.rdsamp(filepath[:-4])
+                except Exception:
+                    continue
+                # annots = wfdb.Annotation(filepath[:-4], 'hea')
+                # print(ecg_record[0].transpose(1,0).shape)
+                numbers = re.findall(r'\d+', ecg_record[1]['comments'][2])
+                output_array = list(map(int, numbers))
+                lx = []
+                for chan in range(ecg_record[0].shape[1]):
+                    resampled_x, _ = wfdb.processing.resample_sig(ecg_record[0][:, chan], 500, 100)
+                    lx.append(resampled_x)
+                dataset.append(lx)
 
-    print(dataset_train)
+    dataset = np.array(dataset)
+    print(dataset.shape)
+    dataset = dataset.astype(np.double, copy=False)
+    print(dataset.shape)
+    X = torch.from_numpy(dataset[:, :1000, :])
+    print(X.shape)
+    # X = X.permute(0, 2, 1)
+    X = X[:, None, :, :]
+    # assert a.shape == (4, 5, 1, 6)
+    dataset_train = X
+
+    print(dataset_train.size())
 
     sampler_train = torch.utils.data.RandomSampler(dataset_train)
 
@@ -149,7 +178,7 @@ def main(args):
     
     # define the model
     model = models_mae.__dict__[args.model](norm_pix_loss=args.norm_pix_loss)
-
+    model = model.double()
     model_without_ddp = model
     print("Model = %s" % str(model_without_ddp))
 
@@ -183,7 +212,7 @@ def main(args):
             args=args
         )
 
-        if args.output_dir and (epoch % 20 == 0 or epoch + 1 == args.epochs):
+        if args.output_dir and (epoch % 2 == 0 or epoch + 1 == args.epochs):
             misc.save_model(
                 args=args, model=model, model_without_ddp=model_without_ddp, optimizer=optimizer,
                 loss_scaler=loss_scaler, epoch=epoch)
