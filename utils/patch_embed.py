@@ -15,15 +15,16 @@ import torch
 from torch import nn as nn
 import torch.nn.functional as F
 
-from format import Format, nchw_to
-from helpers import to_2tuple
+from utils.format import Format, nchw_to
+from utils.helpers import to_2tuple
 from trace_utils import _assert
 
 _logger = logging.getLogger(__name__)
 
 
 class PatchEmbed(nn.Module):
-    """ 2D Image to Patch Embedding
+    """ 12 Channel ECG to Patch Embedding
+        change img_size and patch_size as per data.
     """
     output_fmt: Format
     dynamic_img_pad: torch.jit.Final[bool]
@@ -93,6 +94,7 @@ class PatchEmbed(nn.Module):
             x = x.flatten(2) # NCHW -> NLC
         elif self.output_fmt != Format.NCHW:
             x = nchw_to(x, self.output_fmt)
+        # 3 Convolutional Layers as described in the MAE ECG paper, along with batch normalisations.
         x = self.proj1(x)
         x = self.norm32(x)
         x = self.proj2(x)
@@ -102,23 +104,7 @@ class PatchEmbed(nn.Module):
         return x
 
 
-
-# seq_length = 1000
-
-# patch_size = (1, 50)
-# embed_dim = 128
-
-# # Create a PatchEmbed module for ECG data
-# patch_embed_ecg = PatchEmbed(img_size=(12, 1000), patch_size=patch_size, embed_dim=embed_dim)
-
-# # Generate random 12-lead ECG data
-# x = torch.randn(50, 1, 12, seq_length)  # Shape: (batch_size, 1, sequence_length)
-
-# # Get patch embeddings
-# patch_embeddings = patch_embed_ecg(x)
-# print("Patch embeddings shape:", patch_embeddings.shape)
-
-
+# Need to read about this.
 
 class PatchEmbedWithSize(PatchEmbed):
     """ 2D Image to Patch Embedding

@@ -15,9 +15,14 @@ import torch
 import torch.nn as nn
 
 from timm.models.vision_transformer import Block
-from patch_embed import PatchEmbed
+from utils.patch_embed import PatchEmbed
 
-from pos_embed import get_2d_sincos_pos_embed
+from utils.pos_embed import get_2d_sincos_pos_embed
+
+
+# Main changes img_size adjusted to 12 channel ECG signal - 12*1000
+# Functions - Patchify and unpatchify
+# Other functions remains the same
 
 
 class MaskedAutoencoderViT(nn.Module):
@@ -75,7 +80,7 @@ class MaskedAutoencoderViT(nn.Module):
         decoder_pos_embed = get_2d_sincos_pos_embed(self.decoder_pos_embed.shape[-1],  (self.patch_embed.num_patches, 1), cls_token=True)
         self.decoder_pos_embed.data.copy_(torch.from_numpy(decoder_pos_embed).float().unsqueeze(0))
 
-        # initialize patch_embed like nn.Linear (instead of nn.Conv2d)
+        # initialize patch_embed like nn.Linear, with changes for 12 channel ecg.
         w1 = self.patch_embed.proj.weight.data
         torch.nn.init.xavier_uniform_(w1.view([w1.shape[0], -1]))
         w2 = self.patch_embed.proj.weight.data
@@ -102,8 +107,8 @@ class MaskedAutoencoderViT(nn.Module):
 
     def patchify(self, imgs):
         """
-        imgs: (N, 3, H, W)
-        x: (N, L, patch_size**2 *3)
+        imgs: (N, 1, H, W) - 12 channel ECG - H = No. of channels, W = Length of ECG signal (1000 in this case)
+        x: (N, L, patch_size_height*patch_size_width*1)
         """
         ph = self.patch_embed.patch_size[0]
         pw = self.patch_embed.patch_size[1]
@@ -117,8 +122,8 @@ class MaskedAutoencoderViT(nn.Module):
 
     def unpatchify(self, x):
         """
-        x: (N, L, patch_size**2 *3)
-        imgs: (N, 3, H, W)
+        x: (N, L, patch_size_height*patch_size_width*1)
+        imgs: (N, 1, H, W) - 12 channel ECG - H = No. of channels, W = Length of ECG signal (1000 in this case)
         """
         ph = self.patch_embed.patch_size[0]
         pw = self.patch_embed.patch_size[1]
@@ -211,8 +216,8 @@ class MaskedAutoencoderViT(nn.Module):
 
     def forward_loss(self, imgs, pred, mask):
         """
-        imgs: [N, 3, H, W]
-        pred: [N, L, p*p*3]
+        imgs: (N, 1, H, W) - 12 channel ECG - H = No. of channels, W = Length of ECG signal (1000 in this case)
+        x: (N, L, patch_size_height*patch_size_width*1)
         mask: [N, L], 0 is keep, 1 is remove, 
         """
         target = self.patchify(imgs)
@@ -238,13 +243,8 @@ class MaskedAutoencoderViT(nn.Module):
         return loss, pred, mask
 
 
-def mae_vit_base_patch16_dec512d8b(**kwargs):
-    model = MaskedAutoencoderViT(
-        patch_size=16, embed_dim=768, depth=12, num_heads=12,
-        decoder_embed_dim=512, decoder_depth=8, decoder_num_heads=16,
-        mlp_ratio=4, norm_layer=partial(nn.LayerNorm, eps=1e-6), **kwargs)
-    return model
 
+# Model architecture as described in the paper.
 def mae_vit_1dcnn(**kwargs):
     model = MaskedAutoencoderViT(
         patch_size=(1, 50), embed_dim=128, depth=6, num_heads=8,
@@ -252,6 +252,13 @@ def mae_vit_1dcnn(**kwargs):
         mlp_ratio=3, norm_layer=partial(nn.LayerNorm, eps=1e-6), **kwargs)
     return model
 
+
+def mae_vit_base_patch16_dec512d8b(**kwargs):
+    model = MaskedAutoencoderViT(
+        patch_size=16, embed_dim=768, depth=12, num_heads=12,
+        decoder_embed_dim=512, decoder_depth=8, decoder_num_heads=16,
+        mlp_ratio=4, norm_layer=partial(nn.LayerNorm, eps=1e-6), **kwargs)
+    return model
 
 
 def mae_vit_large_patch16_dec512d8b(**kwargs):
