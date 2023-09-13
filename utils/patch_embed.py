@@ -17,7 +17,7 @@ import torch.nn.functional as F
 
 from utils.format import Format, nchw_to
 from utils.helpers import to_2tuple
-from trace_utils import _assert
+from utils.trace_utils import _assert
 
 _logger = logging.getLogger(__name__)
 
