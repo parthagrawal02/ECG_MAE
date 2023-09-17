@@ -21,7 +21,7 @@ import torch
 from wfdb import processing
 import re
 import torch.backends.cudnn as cudnn
-# from torch.utils.tensorboard import SummaryWriter
+from torch.utils.tensorboard import SummaryWriter
 import timm
 
 # assert timm.__version__ == "0.3.2" # version check
@@ -108,6 +108,17 @@ def get_args_parser():
                         help='Probability of switching to cutmix when both mixup and cutmix enabled')
     parser.add_argument('--mixup_mode', type=str, default='batch',
                         help='How to apply mixup/cutmix params. Per "batch", "pair", or "elem"')
+    # * Data Set
+    
+    parser.add_argument('--val_start',type=int,  default= 1,
+                        help='validation start')
+    parser.add_argument('--val_end',type=int, default=30,
+                        help='validation end')
+    parser.add_argument('--train_start',type=int, default=31,
+                        help='train start')
+    parser.add_argument('--train_end',type=int, default=40,
+                        help='train end')
+
 
     # * Finetuning params
     parser.add_argument('--finetune', default='',
@@ -125,7 +136,7 @@ def get_args_parser():
 
     parser.add_argument('--output_dir', default='./output_dir_fin',
                         help='path where to save, empty for no saving')
-    parser.add_argument('--log_dir', default=None,
+    parser.add_argument('--log_dir', default='./output_dir_fin',
                         help='path where to tensorboard log')
     parser.add_argument('--device', default='cuda',
                         help='device to use for training / testing')
@@ -161,6 +172,60 @@ def get_args_parser():
     return parser
 
 
+# Gets data from Astart - Aend from the data_path, also converts Y(target) from SNOMED ids.
+
+def get_data(start, end):
+    classes = {
+    426177001: 1,
+    426783006: 2,
+    164889003: 3,
+    427084000: 4,
+    164890007: 5,
+    427393009: 6,
+    426761007: 7,
+    713422000: 8,
+    233896004: 9,
+    233897008: 0
+    }
+    dataset = []
+    y = []
+    for n in range(start, end):
+        for j in range(0, 10):
+            for filepath in glob.iglob(args.data_path + '/physionet/WFDBRecords/' + f"{n:02}" +  '/' + f"{n:02}" + str(j) +  '/*.hea'):
+                try:
+                    ecg_record = wfdb.rdsamp(filepath[:-4])
+                except Exception:
+                    continue
+                # annots = wfdb.Annotation(filepath[:-4], 'hea')
+                # print(ecg_record[0].transpose(1,0).shape)
+                numbers = re.findall(r'\d+', ecg_record[1]['comments'][2])
+                output_array = list(map(int, numbers))
+                for j in output_array:
+                    if int(j) in classes:
+                        output_array = j
+                if isinstance(output_array, list):
+                    continue
+                y.append(output_array)
+#                lx = []
+#                for chan in range(ecg_record[0].shape[1]):
+#                    resampled_x, _ = wfdb.processing.resample_sig(ecg_record[0][:, chan], 500, 100)
+#                    lx.append(resampled_x)
+                dataset.append(ecg_record[0])
+    dataset = np.array(dataset)
+    print(dataset.shape)
+    dataset = dataset.astype(np.double, copy=False)
+    print(dataset.shape)
+    X = torch.from_numpy(dataset[:, :, :])
+    print(X.shape)
+    for i in range(len(y)):
+        y[i] = classes[y[i]]
+    Y = torch.from_numpy(np.array(y))
+    X = X[:, None, :, :]
+    dataset_train = torch.utils.data.TensorDataset(X, Y)
+
+    return dataset_train
+
+
 
 
 def main(args):
@@ -179,62 +244,10 @@ def main(args):
     if args.cuda is not None:
         cudnn.benchmark = True
     
-    def get_data(start, end):
-        dataset = []
-        y = []
-        for n in range(start, end):
-            for j in range(0, 10):
-                for filepath in glob.iglob(args.data_path + '/physionet/WFDBRecords/' + f"{n:02}" +  '/' + f"{n:02}" + str(j) +  '/*.hea'):
-                    try:
-                        ecg_record = wfdb.rdsamp(filepath[:-4])
-                    except Exception:
-                        continue
-                    # annots = wfdb.Annotation(filepath[:-4], 'hea')
-                    # print(ecg_record[0].transpose(1,0).shape)
-                    numbers = re.findall(r'\d+', ecg_record[1]['comments'][2])
-                    output_array = list(map(int, numbers))
-                    y.append(output_array)
-                    lx = []
-                    for chan in range(ecg_record[0].shape[1]):
-                        resampled_x, _ = wfdb.processing.resample_sig(ecg_record[0][:, chan], 500, 100)
-                        lx.append(resampled_x)
-                    dataset.append(lx)
-        dataset = np.array(dataset)
-        print(dataset.shape)
-        dataset = dataset.astype(np.double, copy=False)
-        print(dataset.shape)
-        X = torch.from_numpy(dataset[:, :, :])
-        print(X.shape)
-        classes = {
-        426177001: 1,
-        426783006: 2,
-        164889003: 3,
-        427084000: 4,
-        164890007: 5,
-        427393009: 6,
-        426761007: 7,
-        713422000: 8,
-        233896004: 9,
-        233897008: 0
-        }
-        for i in range(len(y)):
-            for j in y[i]:
-                if int(j) in classes:
-                    # classes[int(j)] += 1
-                    y[i] = j
-                    break
-        for i in range(len(y)):
-            y[i] = classes[y[i]]
-        Y = torch.from_numpy(np.array(y))
-        X = X[:, None, :, :]
-        dataset_train = torch.utils.data.TensorDataset(X, Y)
-
-        return dataset_train
-
     # dataset_train = build_dataset(is_train=True, args=args)
     # dataset_val = build_dataset(is_train=False, args=args)
-    dataset_train = get_data(1, 3)
-    dataset_val = get_data(6, 7)
+    dataset_train = get_data(args.train_start, args.train_end)    # Training Data -
+    dataset_val = get_data(args.val_start, args.val_end)
 
     if args.distributed is not None:  # args.distributed:
         num_tasks = misc.get_world_size()
@@ -258,7 +271,7 @@ def main(args):
 
     if global_rank == 0 and args.log_dir is not None and not args.eval:
         os.makedirs(args.log_dir, exist_ok=True)
-        # log_writer = SummaryWriter(log_dir=args.log_dir)
+        log_writer = SummaryWriter(log_dir=args.log_dir)
     else:
         log_writer = None
 
@@ -311,19 +324,19 @@ def main(args):
         msg = model.load_state_dict(checkpoint_model, strict=False)
         print(msg)
 
-        if args.global_pool:
-            assert set(msg.missing_keys) == {'head.weight', 'head.bias', 'fc_norm.weight', 'fc_norm.bias'}
-        else:
-            assert set(msg.missing_keys) == {'head.weight', 'head.bias'}
+#        if args.global_pool:
+#            assert set(msg.missing_keys) == {'head.weight', 'head.bias', 'fc_norm.weight', 'fc_norm.bias'}
+#        else:
+        assert set(msg.missing_keys) == {'head.weight', 'head.bias'}
 
         # manually initialize fc layer
         trunc_normal_(model.head.weight, std=2e-5)
-
+        
+    model = model.double()
     if args.cuda is not None:
         model.to(device)
-    model = model.double()
-    model_without_ddp = model
     n_parameters = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    model_without_ddp = model
 
     print("Model = %s" % str(model_without_ddp))
     print('number of params (M): %.2f' % (n_parameters / 1.e6))
@@ -332,7 +345,6 @@ def main(args):
     
     if args.lr is None:  # only base_lr is specified
         args.lr = args.blr * eff_batch_size / 256
-
     print("base lr: %.2e" % (args.lr * 256 / eff_batch_size))
     print("actual lr: %.2e" % args.lr)
 
@@ -390,7 +402,7 @@ def main(args):
                 args=args, model=model, model_without_ddp=model_without_ddp, optimizer=optimizer,
                 loss_scaler=loss_scaler, epoch=epoch)
 
-        test_stats = evaluate(data_loader_val, model, device)
+        test_stats = evaluate(data_loader_val, model, device, args = args)
         print(f"Accuracy of the network on the {len(dataset_val)} test images: {test_stats['acc1']:.1f}%")
         max_accuracy = max(max_accuracy, test_stats["acc1"])
         print(f'Max accuracy: {max_accuracy:.2f}%')

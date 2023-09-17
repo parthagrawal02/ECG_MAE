@@ -31,7 +31,7 @@ class MaskedAutoencoderViT(nn.Module):
     def __init__(self, img_size=(12, 1000), patch_size=(1, 50), in_chans=1,
                  embed_dim=128, depth=6, num_heads=8,
                  decoder_embed_dim=64, decoder_depth=3, decoder_num_heads=8,
-                 mlp_ratio=3., norm_layer=nn.BatchNorm1d, norm_pix_loss=False):
+                 mlp_ratio=3., norm_layer=nn.LayerNorm, norm_pix_loss=False):
         super().__init__()
 
         # --------------------------------------------------------------------------
@@ -227,7 +227,7 @@ class MaskedAutoencoderViT(nn.Module):
             var = target.var(dim=-1, keepdim=True)
             target = (target - mean) / (var + 1.e-6)**.5
 
-        loss = (pred - target) ** 2
+        loss = abs(pred - target)
         loss = loss.mean(dim=-1)  # [N, L], mean loss per patch
 
         loss = (loss * mask).sum() / mask.sum()  # mean loss on removed patches

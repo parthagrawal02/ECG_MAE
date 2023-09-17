@@ -68,6 +68,8 @@ class PatchEmbed(nn.Module):
         self.proj2 = nn.Conv1d(32, 64, kernel_size=7, stride=1,padding= 'same', bias=bias)
         self.norm64 = nn.BatchNorm1d(64)
         self.proj = nn.Conv1d(64, embed_dim, kernel_size=50, stride=50, bias=bias)
+        self.relu = nn.ReLU()
+        self.layer_norm = nn.LayerNorm(embed_dim)
 
     
     def forward(self, x):
@@ -97,10 +99,12 @@ class PatchEmbed(nn.Module):
         # 3 Convolutional Layers as described in the MAE ECG paper, along with batch normalisations.
         x = self.proj1(x)
         x = self.norm32(x)
+        x = self.relu(x)
         x = self.proj2(x)
         x = self.norm64(x)
+        x = self.relu(x)
         x = self.proj(x).transpose(2, 1)
-        # x = self.norm(x)
+        x = self.layer_norm(x)
         return x
 
 

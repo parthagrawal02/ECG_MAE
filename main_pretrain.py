@@ -25,7 +25,7 @@ import glob
 
 import torch
 import torch.backends.cudnn as cudnn
-# from torch.utils.tensorboard import SummaryWriter
+from torch.utils.tensorboard import SummaryWriter
 import torchvision.transforms as transforms
 import torchvision.datasets as datasets
 import timm
@@ -97,6 +97,8 @@ def get_args_parser():
                         help='Pin CPU memory in DataLoader for more efficient (sometimes) transfer to GPU.')
     parser.add_argument('--no_pin_mem', action='store_false', dest='pin_mem')
     parser.set_defaults(pin_mem=True)
+    parser.add_argument('--cuda', default=None, type=str, help = 'to enable cuda give, change it from None to any str')
+
 
     # distributed training parameters
     parser.add_argument('--world_size', default=1, type=int,
@@ -114,21 +116,21 @@ def main(args):
 
     print('job dir: {}'.format(os.path.dirname(os.path.realpath(__file__))))
     print("{}".format(args).replace(', ', ',\n'))
-
+    
     device = torch.device(args.device)
 
     # fix the seed for reproducibility
     seed = args.seed + misc.get_rank()
     torch.manual_seed(seed)
     np.random.seed(seed)
-
-    cudnn.benchmark = False
+    if args.cuda is not None:
+        cudnn.benchmark = True
         
     # Physionet Dataset  - change range n from (1, 46) to the number of folders you need
     
     dataset = []
     files = 0
-    for n in range(1, 46):
+    for n in range(1, 2):
         for j in range(0, 10):
             for filepath in glob.iglob(args.data_path + '/physionet/WFDBRecords/' + f"{n:02}" +  '/' + f"{n:02}" + str(j) +  '/*.hea'):
                 try:
@@ -160,6 +162,13 @@ def main(args):
 
     sampler_train = torch.utils.data.RandomSampler(dataset_train)
 
+    if args.log_dir is not None:
+        os.makedirs(args.log_dir, exist_ok=True)
+        log_writer = SummaryWriter(log_dir=args.log_dir)
+    else:
+        log_writer = None
+
+
     data_loader_train = torch.utils.data.DataLoader(
         dataset_train, sampler=sampler_train,
         batch_size=args.batch_size,
@@ -170,6 +179,8 @@ def main(args):
     
     # define the model
     model = models_mae.__dict__[args.model](norm_pix_loss=args.norm_pix_loss)
+    if args.cuda is not None:
+        model.to(device)
     model = model.double()
     model_without_ddp = model
     print("Model = %s" % str(model_without_ddp))
@@ -187,7 +198,7 @@ def main(args):
 
     
     # following timm: set wd as 0 for bias and norm layers
-    param_groups = optim_factory.add_weight_decay(model_without_ddp, args.weight_decay)
+    param_groups = optim_factory.param_groups_weight_decay(model_without_ddp, args.weight_decay)
     optimizer = torch.optim.AdamW(param_groups, lr=args.lr, betas=(0.9, 0.95))
     print(optimizer)
     loss_scaler = NativeScaler()
@@ -197,29 +208,30 @@ def main(args):
     print(f"Start training for {args.epochs} epochs")
     start_time = time.time()
 
-    # if args.resume != '':
-    #     checkpoint = torch.load("output_dir/checkpoint-" + str(args.start_epoch) + ".pth")
-    #     model.load_state_dict(checkpoint['model'])
-    #     epoch = checkpoint['epoch']
+#    if args.resume != '':
+#        checkpoint = torch.load("output_dir/checkpoint-" + str(args.start_epoch) + ".pth")
+#        model.load_state_dict(checkpoint['model'])
+#        epoch = checkpoint['epoch']
 
-    start = args.start_epoch
-    for epoch in range(start, args.epochs):
+    for epoch in range(args.start_epoch, args.epochs):
         train_stats = train_one_epoch(
             model, data_loader_train,
             optimizer, device, epoch, loss_scaler,
-            log_writer=None,
+            log_writer=log_writer,
             args=args
         )
-
+        log_stats = {**{f'train_{k}': v for k, v in train_stats.items()},
+                        'epoch': epoch,}
+        
         if args.output_dir and (epoch % 2 == 0 or epoch + 1 == args.epochs):
             misc.save_model(
                 args=args, model=model, model_without_ddp=model_without_ddp, optimizer=optimizer,
                 loss_scaler=loss_scaler, epoch=epoch)
-        # if args.output_dir and misc.is_main_process():
-        #     if log_writer is not None:
-        #         log_writer.flush()
-        #     with open(os.path.join(args.output_dir, "log.txt"), mode="a", encoding="utf-8") as f:
-        #         f.write(json.dumps(log_stats) + "\n")
+        if args.output_dir:
+            if log_writer is not None:
+                log_writer.flush()
+            with open(os.path.join(args.output_dir, "log.txt"), mode="a", encoding="utf-8") as f:
+                f.write(json.dumps(log_stats) + "\n")
 
     total_time = time.time() - start_time
     total_time_str = str(datetime.timedelta(seconds=int(total_time)))

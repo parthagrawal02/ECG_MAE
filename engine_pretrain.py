@@ -42,20 +42,26 @@ def train_one_epoch(model: torch.nn.Module,
         # we use a per iteration (instead of per epoch) lr scheduler
         if data_iter_step % accum_iter == 0:
             lr_sched.adjust_learning_rate(optimizer, data_iter_step / len(data_loader) + epoch, args)
-            
-        loss, _, _ = model(samples, mask_ratio=args.mask_ratio)
+        
+        if args.cuda is not None:
+            with torch.cuda.amp.autocast():
+                loss, _, _ = model(samples.to(device), mask_ratio=args.mask_ratio)
+        else:
+            loss, _, _ = model(samples, mask_ratio=args.mask_ratio)
 
         loss_value = loss.item()
 
-        # if not math.isfinite(loss_value):
-        #     print("Loss is {}, stopping training".fwormat(loss_value))
-        #     sys.exit(1)
+        if not math.isfinite(loss_value):
+            print("Loss is {}, stopping training".fwormat(loss_value))
+            sys.exit(1)
 
         loss /= accum_iter
         loss_scaler(loss, optimizer, parameters=model.parameters(),
                     update_grad=(data_iter_step + 1) % accum_iter == 0)
         if (data_iter_step + 1) % accum_iter == 0:
             optimizer.zero_grad()
+        if args.cuda is not None:
+            torch.cuda.synchronize()
 
 
         metric_logger.update(loss=loss_value)

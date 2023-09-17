@@ -102,7 +102,7 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
 
 
 @torch.no_grad()
-def evaluate(data_loader, model, device, cuda = None):
+def evaluate(data_loader, model, device, args):
     criterion = torch.nn.CrossEntropyLoss()
 
     metric_logger = misc.MetricLogger(delimiter="  ")
@@ -114,12 +114,12 @@ def evaluate(data_loader, model, device, cuda = None):
     for batch in metric_logger.log_every(data_loader, 10, header):
         images = batch[0]
         target = batch[-1]
-        if cuda is not None:
+        if args.cuda is not None:
             images = images.to(device, non_blocking=True)
             target = target.to(device, non_blocking=True)
 
         # compute output
-        if cuda is not None:
+        if args.cuda is not None:
             with torch.cuda.amp.autocast():
                 output = model(images)
                 loss = criterion(output, target)
