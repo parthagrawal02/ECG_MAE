@@ -63,13 +63,24 @@ class PatchEmbed(nn.Module):
 
         self.strict_img_size = strict_img_size
         self.dynamic_img_pad = dynamic_img_pad
-        self.proj1 = nn.Conv1d(1, 32, kernel_size=15, stride=1,padding= 'same', bias=bias)
-        self.norm32 = nn.BatchNorm1d(32)
-        self.proj2 = nn.Conv1d(32, 64, kernel_size=7, stride=1,padding= 'same', bias=bias)
-        self.norm64 = nn.BatchNorm1d(64)
-        self.proj = nn.Conv1d(64, embed_dim, kernel_size=50, stride=50, bias=bias)
-        self.relu = nn.ReLU()
+        self.patch = nn.Sequential(
+          nn.Conv1d(1, 32, kernel_size=15, stride=1,padding= 'same', bias=bias),
+          nn.BatchNorm1d(32),
+          nn.ReLU(),
+          nn.Conv1d(32, 64, kernel_size=7, stride=1,padding= 'same', bias=bias),
+          nn.BatchNorm1d(64),
+          nn.ReLU(),
+          nn.Conv1d(64, embed_dim, kernel_size=50, stride=50, bias=bias),
+        )
         self.layer_norm = nn.LayerNorm(embed_dim)
+
+#        self.proj1 = nn.Conv1d(1, 32, kernel_size=15, stride=1,padding= 'same', bias=bias)
+#        self.norm32 = nn.BatchNorm1d(32)
+#        self.proj2 = nn.Conv1d(32, 64, kernel_size=7, stride=1,padding= 'same', bias=bias)
+#        self.norm64 = nn.BatchNorm1d(64)
+#        self.proj = nn.Conv1d(64, embed_dim, kernel_size=50, stride=50, bias=bias)
+#        self.relu = nn.ReLU()
+#        self.layer_norm = nn.LayerNorm(embed_dim)
 
     
     def forward(self, x):
@@ -97,13 +108,13 @@ class PatchEmbed(nn.Module):
         elif self.output_fmt != Format.NCHW:
             x = nchw_to(x, self.output_fmt)
         # 3 Convolutional Layers as described in the MAE ECG paper, along with batch normalisations.
-        x = self.proj1(x)
-        x = self.norm32(x)
-        x = self.relu(x)
-        x = self.proj2(x)
-        x = self.norm64(x)
-        x = self.relu(x)
-        x = self.proj(x).transpose(2, 1)
+        x = self.patch(x).transpose(2, 1)
+#        x = self.norm32(x)
+#        x = self.relu(x)
+#        x = self.proj2(x)
+#        x = self.norm64(x)
+#        x = self.relu(x)
+#        x = self.proj(x).transpose(2, 1)
         x = self.layer_norm(x)
         return x
 

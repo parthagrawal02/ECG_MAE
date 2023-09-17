@@ -130,12 +130,14 @@ def main(args):
     
     dataset = []
     files = 0
-    for n in range(1, 2):
+    for n in range(1, 25):
         for j in range(0, 10):
             for filepath in glob.iglob(args.data_path + '/physionet/WFDBRecords/' + f"{n:02}" +  '/' + f"{n:02}" + str(j) +  '/*.hea'):
                 try:
                     ecg_record = wfdb.rdsamp(filepath[:-4])
                 except Exception:
+                    continue
+                if(len(ecg_record[0]) < 3000):
                     continue
                 # annots = wfdb.Annotation(filepath[:-4], 'hea')
                 # print(ecg_record[0].transpose(1,0).shape)

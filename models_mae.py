@@ -70,7 +70,8 @@ class MaskedAutoencoderViT(nn.Module):
         self.norm_pix_loss = norm_pix_loss
 
         self.initialize_weights()
-
+        
+    
     def initialize_weights(self):
         # initialization
         # initialize (and freeze) pos_embed by sin-cos embedding
@@ -79,14 +80,26 @@ class MaskedAutoencoderViT(nn.Module):
 
         decoder_pos_embed = get_2d_sincos_pos_embed(self.decoder_pos_embed.shape[-1],  (self.patch_embed.num_patches, 1), cls_token=True)
         self.decoder_pos_embed.data.copy_(torch.from_numpy(decoder_pos_embed).float().unsqueeze(0))
+                    
+        for layer in self.patch_embed.patch:
+            if isinstance(layer, nn.Conv1d):
+                torch.nn.init.xavier_uniform_(layer.weight)
+                if layer.bias is not None:
+                    torch.nn.init.constant_(layer.bias, 0.0)
+            elif isinstance(layer, nn.LayerNorm):
+                nn.init.constant_(layer.bias, 0)
+                nn.init.constant_(layer.weight, 1.0)
+            elif isinstance(layer, nn.ReLU):
+                nn.init.kaiming_normal_(layer.weight, mode='fan_in', nonlinearity='relu')
 
         # initialize patch_embed like nn.Linear, with changes for 12 channel ecg.
-        w1 = self.patch_embed.proj.weight.data
-        torch.nn.init.xavier_uniform_(w1.view([w1.shape[0], -1]))
-        w2 = self.patch_embed.proj.weight.data
-        torch.nn.init.xavier_uniform_(w2.view([w2.shape[0], -1]))
-        w3 = self.patch_embed.proj.weight.data
-        torch.nn.init.xavier_uniform_(w3.view([w3.shape[0], -1]))
+#        w1 = self.patch_embed.proj.weight.data
+#        torch.nn.init.xavier_uniform_(w1.view([w1.shape[0], -1]))
+#        w2 = self.patch_embed.proj.weight.data
+#        torch.nn.init.xavier_uniform_(w2.view([w2.shape[0], -1]))
+#        w3 = self.patch_embed.proj.weight.data
+#        torch.nn.init.xavier_uniform_(w3.view([w3.shape[0], -1]))
+        
 
         # timm's trunc_normal_(std=.02) is effectively normal_(std=0.02) as cutoff is too big (2.)
         torch.nn.init.normal_(self.cls_token, std=.02)
@@ -221,7 +234,6 @@ class MaskedAutoencoderViT(nn.Module):
         mask: [N, L], 0 is keep, 1 is remove, 
         """
         target = self.patchify(imgs)
-        # print("target size" + str(target.size()))
         if self.norm_pix_loss:
             mean = target.mean(dim=-1, keepdim=True)
             var = target.var(dim=-1, keepdim=True)
