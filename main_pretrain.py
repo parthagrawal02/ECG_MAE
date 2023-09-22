@@ -14,6 +14,7 @@ import json
 import numpy as np
 import os
 import time
+
 from pathlib import Path
 
 import torch.nn.functional as F
@@ -34,7 +35,7 @@ import timm.optim.optim_factory as optim_factory
 
 import utils.misc as misc
 from utils.misc import NativeScalerWithGradNormCount as NativeScaler
-
+from utils.ecg_dataloader import CustomDataset
 import models_mae
 
 from engine_pretrain import train_one_epoch
@@ -127,50 +128,18 @@ def main(args):
         cudnn.benchmark = True
         
     # Physionet Dataset  - change range n from (1, 46) to the number of folders you need
+    # Custom Dataloader, arguments - data_path, start file and end file (from the 46 folders)
+    dataset = torch.utils.data.Subset(CustomDataset(args.data_path, 0, 2), list(range(5)))
+    sampler_train = torch.utils.data.RandomSampler(dataset)
     
-    dataset = []
-    files = 0
-    for n in range(1, 2):
-        for j in range(0, 10):
-            for filepath in glob.iglob(args.data_path + '/physionet/WFDBRecords/' + f"{n:02}" +  '/' + f"{n:02}" + str(j) +  '/*.hea'):
-                try:
-                    ecg_record = wfdb.rdsamp(filepath[:-4])
-                except Exception:
-                    continue
-                # annots = wfdb.Annotation(filepath[:-4], 'hea')
-                # print(ecg_record[0].transpose(1,0).shape)
-                numbers = re.findall(r'\d+', ecg_record[1]['comments'][2])
-                output_array = list(map(int, numbers))
-                lx = []
-                for chan in range(ecg_record[0].shape[1]):
-                    resampled_x, _ = wfdb.processing.resample_sig(ecg_record[0][:, chan], 500, 100)
-                    lx.append(resampled_x)
-                dataset.append(lx)
-
-    dataset = np.array(dataset)
-    print(dataset.shape)
-    dataset = dataset.astype(np.double, copy=False)
-    print(dataset.shape)
-    X = torch.from_numpy(dataset[:, :, :])
-    print(X.shape)
-    # X = X.permute(0, 2, 1)
-    X = X[:, None, :, :]
-    # assert a.shape == (4, 5, 1, 6)
-    dataset_train = X
-
-    print(dataset_train.size())
-
-    sampler_train = torch.utils.data.RandomSampler(dataset_train)
-
     if args.log_dir is not None:
         os.makedirs(args.log_dir, exist_ok=True)
         log_writer = SummaryWriter(log_dir=args.log_dir)
     else:
         log_writer = None
 
-
     data_loader_train = torch.utils.data.DataLoader(
-        dataset_train, sampler=sampler_train,
+        dataset, sampler=sampler_train,
         batch_size=args.batch_size,
         num_workers=args.num_workers,
         pin_memory=args.pin_mem,
@@ -182,6 +151,7 @@ def main(args):
     if args.cuda is not None:
         model.to(device)
     model = model.double()
+    model.train()
     model_without_ddp = model
     print("Model = %s" % str(model_without_ddp))
 
@@ -227,6 +197,9 @@ def main(args):
             misc.save_model(
                 args=args, model=model, model_without_ddp=model_without_ddp, optimizer=optimizer,
                 loss_scaler=loss_scaler, epoch=epoch)
+        log_stats = {**{f'train_{k}': v for k, v in train_stats.items()},
+                        'epoch': epoch,}
+
         if args.output_dir:
             if log_writer is not None:
                 log_writer.flush()

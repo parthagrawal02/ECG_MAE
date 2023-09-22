@@ -5,7 +5,7 @@
 # LICENSE file in the root directory of this source tree.
 # --------------------------------------------------------
 # References:
-# timm: https://github.com/rwightman/pytorch-image-models/tree/master/timm
+# timm: https://github.com/rwightman/pyto/Users/parthagrawal02/Library/CloudStorage/GoogleDrive-acads.parth@gmail.com/My Drive/project_folder/ECG_MAE_code/main_pretrain.pyrch-image-models/tree/master/timm
 # DeiT: https://github.com/facebookresearch/deit
 # --------------------------------------------------------
 
@@ -70,23 +70,27 @@ class MaskedAutoencoderViT(nn.Module):
         self.norm_pix_loss = norm_pix_loss
 
         self.initialize_weights()
-
+        
+    
     def initialize_weights(self):
         # initialization
         # initialize (and freeze) pos_embed by sin-cos embedding
-        pos_embed = get_2d_sincos_pos_embed(self.pos_embed.shape[-1], (self.patch_embed.num_patches, 1), cls_token=True)
+        pos_embed = get_2d_sincos_pos_embed(self.pos_embed.shape[-1], (12, self.patch_embed.num_patches//12), cls_token=True)
+        # grid = (height, width). height = 12 here for 12 lead ecg signals
         self.pos_embed.data.copy_(torch.from_numpy(pos_embed).float().unsqueeze(0))
 
-        decoder_pos_embed = get_2d_sincos_pos_embed(self.decoder_pos_embed.shape[-1],  (self.patch_embed.num_patches, 1), cls_token=True)
+        decoder_pos_embed = get_2d_sincos_pos_embed(self.decoder_pos_embed.shape[-1],  (12, self.patch_embed.num_patches//12), cls_token=True)
         self.decoder_pos_embed.data.copy_(torch.from_numpy(decoder_pos_embed).float().unsqueeze(0))
-
-        # initialize patch_embed like nn.Linear, with changes for 12 channel ecg.
-        w1 = self.patch_embed.proj.weight.data
-        torch.nn.init.xavier_uniform_(w1.view([w1.shape[0], -1]))
-        w2 = self.patch_embed.proj.weight.data
-        torch.nn.init.xavier_uniform_(w2.view([w2.shape[0], -1]))
-        w3 = self.patch_embed.proj.weight.data
-        torch.nn.init.xavier_uniform_(w3.view([w3.shape[0], -1]))
+                    
+        for layer in self.patch_embed.patch:
+            if isinstance(layer, nn.Conv1d):
+                torch.nn.init.kaiming_normal_(layer.weight, mode='fan_in', nonlinearity='relu')
+                # if layer.bias is not None:
+                #     torch.nn.init.constant_(layer.bias, 0.0)
+            elif isinstance(layer, nn.LayerNorm):
+                nn.init.constant_(layer.bias, 0)
+                nn.init.constant_(layer.weight, 1.0)
+        
 
         # timm's trunc_normal_(std=.02) is effectively normal_(std=0.02) as cutoff is too big (2.)
         torch.nn.init.normal_(self.cls_token, std=.02)
@@ -97,8 +101,7 @@ class MaskedAutoencoderViT(nn.Module):
 
     def _init_weights(self, m):
         if isinstance(m, nn.Linear):
-            # we use xavier_uniform following official JAX ViT:
-            torch.nn.init.xavier_uniform_(m.weight)
+            torch.nn.init.kaiming_normal_(m.weight, mode='fan_in', nonlinearity='relu')
             if isinstance(m, nn.Linear) and m.bias is not None:
                 nn.init.constant_(m.bias, 0)
         elif isinstance(m, nn.LayerNorm):
@@ -221,16 +224,21 @@ class MaskedAutoencoderViT(nn.Module):
         mask: [N, L], 0 is keep, 1 is remove, 
         """
         target = self.patchify(imgs)
-        # print("target size" + str(target.size()))
         if self.norm_pix_loss:
             mean = target.mean(dim=-1, keepdim=True)
             var = target.var(dim=-1, keepdim=True)
             target = (target - mean) / (var + 1.e-6)**.5
+            
+        if torch.isnan(target).any():
+            print("NaN values found in target")
+        if torch.isnan(pred).any():
+            print("NaN values found in pred tensors")
 
         loss = abs(pred - target)
         loss = loss.mean(dim=-1)  # [N, L], mean loss per patch
-
+        print(loss)
         loss = (loss * mask).sum() / mask.sum()  # mean loss on removed patches
+        # loss = (loss).sum() / len(loss)*240
         return loss
 
     def forward(self, imgs, mask_ratio=0.75):
