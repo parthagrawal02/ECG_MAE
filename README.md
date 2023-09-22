@@ -20,3 +20,4 @@ data_path to the physionet -
 Eg. if path to the physionet dataset is /Users/parthagrawal02/Desktop/ECG_CNN/physionet/WFDBRecords
 
 then --datapath '/Users/parthagrawal02/Desktop/ECG_CNN'
+ vv
