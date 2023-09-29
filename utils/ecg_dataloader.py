@@ -25,7 +25,7 @@ class CustomDataset(Dataset):
         y = []
         for n in range(start, end):
             for j in range(0, 10):
-                for filepath in glob.iglob(self.data_path + '/physionet/WFDBRecords/' + f"{n:02}" +  '/' + f"{n:02}" + str(j) +  '/*.hea'):
+                for filepath in glob.iglob(self.data_path + '/physionet.0/WFDBRecords/' + f"{n:02}" +  '/' + f"{n:02}" + str(j) +  '/*.hea'):
                     try:
                         ecg_record = wfdb.rdsamp(filepath[:-4])
                     except Exception:
