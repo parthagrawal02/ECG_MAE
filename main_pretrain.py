@@ -104,6 +104,8 @@ def get_args_parser():
     # distributed training parameters
     parser.add_argument('--world_size', default=1, type=int,
                         help='number of distributed processes')
+    parser.add_argument('--start', default=1, type=int)
+    parser.add_argument('--end', default=46, type=int)
     parser.add_argument('--local_rank', default=-1, type=int)
     parser.add_argument('--dist_on_itp', action='store_true')
     parser.add_argument('--dist_url', default='env://',
@@ -113,7 +115,7 @@ def get_args_parser():
 
 
 def main(args):
-    misc.init_distributed_mode(args)
+
 
     print('job dir: {}'.format(os.path.dirname(os.path.realpath(__file__))))
     print("{}".format(args).replace(', ', ',\n'))
@@ -129,7 +131,7 @@ def main(args):
         
     # Physionet Dataset  - change range n from (1, 46) to the number of folders you need
     # Custom Dataloader, arguments - data_path, start file and end file (from the 46 folders)
-    dataset = torch.utils.data.Subset(CustomDataset(args.data_path, 0, 2), list(range(5)))
+    dataset = CustomDataset(args.data_path, args.start, args.end)
     sampler_train = torch.utils.data.RandomSampler(dataset)
     
     if args.log_dir is not None:
