@@ -102,18 +102,18 @@ class PatchEmbed(nn.Module):
             pad_h = (self.patch_size[0] - H % self.patch_size[0]) % self.patch_size[0]
             pad_w = (self.patch_size[1] - W % self.patch_size[1]) % self.patch_size[1]
             x = F.pad(x, (0, pad_w, 0, pad_h))
-        print(x.size())
+        #print(x.size())
         if self.flatten:
             x = x.flatten(2) # NCHW -> NLC
         
         elif self.output_fmt != Format.NCHW:
             x = nchw_to(x, self.output_fmt)
-        print(x.size())
+        #print(x.size())
         # 3 Convolutional Layers as described in the MAE ECG paper, along with batch normalisations.
         x = self.patch(x).transpose(2, 1)
-        print(x.size())
+        #print(x.size())
         x = self.layer_norm(x)
-        print(x.size())
+        #print(x.size())
         return x
 
 
