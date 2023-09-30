@@ -5,7 +5,7 @@ from torch.utils.data import Dataset, DataLoader
 import re
 import wfdb
 from wfdb import processing
-
+import pdb
 class CustomDataset(Dataset):
     def __init__(self, data_path: str = "", start: int = 0, end: int = 46):
         self.class_map  = {
@@ -30,6 +30,7 @@ class CustomDataset(Dataset):
                         ecg_record = wfdb.rdsamp(filepath[:-4])
                     except Exception:
                         continue
+                    # pdb.set_trace()
                     if(np.isnan(ecg_record[0]).any()):
                         print(str(filepath))
                         continue
@@ -58,4 +59,3 @@ class CustomDataset(Dataset):
         img_tensor = ecg_tensor[None, :, :]
         class_id = torch.tensor([class_id])
         return img_tensor, class_id
-

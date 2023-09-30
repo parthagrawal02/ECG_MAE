@@ -37,6 +37,7 @@ import utils.misc as misc
 from utils.misc import NativeScalerWithGradNormCount as NativeScaler
 from utils.ecg_dataloader import CustomDataset
 import models_mae
+from torchsummary import summary
 
 from engine_pretrain import train_one_epoch
 
@@ -104,6 +105,10 @@ def get_args_parser():
     # distributed training parameters
     parser.add_argument('--world_size', default=1, type=int,
                         help='number of distributed processes')
+    parser.add_argument('--start', default=1, type=int)
+    parser.add_argument('--end', default=3, type=int)
+
+
     parser.add_argument('--local_rank', default=-1, type=int)
     parser.add_argument('--dist_on_itp', action='store_true')
     parser.add_argument('--dist_url', default='env://',
@@ -129,7 +134,7 @@ def main(args):
         
     # Physionet Dataset  - change range n from (1, 46) to the number of folders you need
     # Custom Dataloader, arguments - data_path, start file and end file (from the 46 folders)
-    dataset = torch.utils.data.Subset(CustomDataset(args.data_path, 0, 2), list(range(5)))
+    dataset = CustomDataset(args.data_path, args.start, args.end)
     sampler_train = torch.utils.data.RandomSampler(dataset)
     
     if args.log_dir is not None:
@@ -170,11 +175,12 @@ def main(args):
     # following timm: set wd as 0 for bias and norm layers
     param_groups = optim_factory.param_groups_weight_decay(model_without_ddp, args.weight_decay)
     optimizer = torch.optim.AdamW(param_groups, lr=args.lr, betas=(0.9, 0.95))
-    print(optimizer)
+    # print(param_groups)
+    # print(optimizer)
     loss_scaler = NativeScaler()
 
     misc.load_model(args=args, model_without_ddp=model_without_ddp, optimizer=optimizer, loss_scaler=loss_scaler)
-    
+
     print(f"Start training for {args.epochs} epochs")
     start_time = time.time()
 

@@ -1,2 +1,5 @@
 dl/
 output_dir/
+__pycache__/
+output_dir_fin/
+output_dir_fin_f90/

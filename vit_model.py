@@ -89,9 +89,8 @@ class VisionTransformer1(nn.Module):
         x = self.patch_embed(x)
         # print("after patch embed = "+str(x.size()))
         # add pos embed w/o cls token
-        x = x + self.pos_embed[:, 1:, :]
         # masking: length -> length * mask_ratio
-
+        x = x + self.pos_embed[:, 1:, :]
         # append cls token
         cls_token = self.cls_token + self.pos_embed[:, :1, :]
         cls_tokens = cls_token.expand(x.shape[0], -1, -1)
@@ -100,17 +99,15 @@ class VisionTransformer1(nn.Module):
         # apply Transformer blocks
         for blk in self.blocks:
             x = blk(x)
-            
+
         if self.global_pool:
             x = x[:, 1:, :].mean(dim=1)  # global pool without cls token
-            outcome = self.fc_norm(x)
+            outcome = self.head(self.fc_norm(x))
         else:
             x = self.norm(x)
-            outcome = x[:, 0]
-
+            outcome = self.head(x)
         return outcome
-
-
+    
 # Model architecture as described in the paper.
 def vit_1dcnn(**kwargs):
     model = VisionTransformer1(

@@ -134,7 +134,7 @@ class MaskedAutoencoderViT(nn.Module):
         # h = w = int(x.shape[1]**.5)
         # assert h * w == x.shape[1]
         h = 12
-        w = x.shape[1]/12
+        w = x.shape[1]//12
         
         x = x.reshape(shape=(x.shape[0], h, w, ph, pw, 1))
         x = torch.einsum('nhwpqc->nchpwq', x)
@@ -188,6 +188,7 @@ class MaskedAutoencoderViT(nn.Module):
         for blk in self.blocks:
             x = blk(x)
         x = self.norm(x)
+        # print(x.size())
 
         return x, mask, ids_restore
 
@@ -223,6 +224,7 @@ class MaskedAutoencoderViT(nn.Module):
         x: (N, L, patch_size_height*patch_size_width*1)
         mask: [N, L], 0 is keep, 1 is remove, 
         """
+        # pred = self.unpatchify(pred)
         target = self.patchify(imgs)
         if self.norm_pix_loss:
             mean = target.mean(dim=-1, keepdim=True)
@@ -236,7 +238,7 @@ class MaskedAutoencoderViT(nn.Module):
 
         loss = abs(pred - target)
         loss = loss.mean(dim=-1)  # [N, L], mean loss per patch
-        print(loss)
+        # print(loss)
         loss = (loss * mask).sum() / mask.sum()  # mean loss on removed patches
         # loss = (loss).sum() / len(loss)*240
         return loss
@@ -249,8 +251,6 @@ class MaskedAutoencoderViT(nn.Module):
         # print(pred.size())
         loss = self.forward_loss(imgs, pred, mask)
         return loss, pred, mask
-
-
 
 # Model architecture as described in the paper.
 def mae_vit_1dcnn(**kwargs):

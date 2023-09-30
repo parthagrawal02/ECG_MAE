@@ -36,7 +36,7 @@ from utils.pos_embed import interpolate_pos_embed
 from utils.misc import NativeScalerWithGradNormCount as NativeScaler
 import wfdb
 import vit_model
-
+from utils.ecg_dataloader import CustomDataset
 from engine_finetune import train_one_epoch, evaluate
 
 
@@ -174,56 +174,56 @@ def get_args_parser():
 
 # Gets data from Astart - Aend from the data_path, also converts Y(target) from SNOMED ids.
 
-def get_data(start, end):
-    classes = {
-    426177001: 1,
-    426783006: 2,
-    164889003: 3,
-    427084000: 4,
-    164890007: 5,
-    427393009: 6,
-    426761007: 7,
-    713422000: 8,
-    233896004: 9,
-    233897008: 0
-    }
-    dataset = []
-    y = []
-    for n in range(start, end):
-        for j in range(0, 10):
-            for filepath in glob.iglob(args.data_path + '/physionet/WFDBRecords/' + f"{n:02}" +  '/' + f"{n:02}" + str(j) +  '/*.hea'):
-                try:
-                    ecg_record = wfdb.rdsamp(filepath[:-4])
-                except Exception:
-                    continue
-                # annots = wfdb.Annotation(filepath[:-4], 'hea')
-                # print(ecg_record[0].transpose(1,0).shape)
-                numbers = re.findall(r'\d+', ecg_record[1]['comments'][2])
-                output_array = list(map(int, numbers))
-                for j in output_array:
-                    if int(j) in classes:
-                        output_array = j
-                if isinstance(output_array, list):
-                    continue
-                y.append(output_array)
-#                lx = []
-#                for chan in range(ecg_record[0].shape[1]):
-#                    resampled_x, _ = wfdb.processing.resample_sig(ecg_record[0][:, chan], 500, 100)
-#                    lx.append(resampled_x)
-                dataset.append(ecg_record[0])
-    dataset = np.array(dataset)
-    print(dataset.shape)
-    dataset = dataset.astype(np.double, copy=False)
-    print(dataset.shape)
-    X = torch.from_numpy(dataset[:, :, :])
-    print(X.shape)
-    for i in range(len(y)):
-        y[i] = classes[y[i]]
-    Y = torch.from_numpy(np.array(y))
-    X = X[:, None, :, :]
-    dataset_train = torch.utils.data.TensorDataset(X, Y)
+# def get_data(start, end):
+#     classes = {
+#     426177001: 1,
+#     426783006: 2,
+#     164889003: 3,
+#     427084000: 4,
+#     164890007: 5,
+#     427393009: 6,
+#     426761007: 7,
+#     713422000: 8,
+#     233896004: 9,
+#     233897008: 0
+#     }
+#     dataset = []
+#     y = []
+#     for n in range(start, end):
+#         for j in range(0, 10):
+#             for filepath in glob.iglob(args.data_path + '/physionet/WFDBRecords/' + f"{n:02}" +  '/' + f"{n:02}" + str(j) +  '/*.hea'):
+#                 try:
+#                     ecg_record = wfdb.rdsamp(filepath[:-4])
+#                 except Exception:
+#                     continue
+#                 # annots = wfdb.Annotation(filepath[:-4], 'hea')
+#                 # print(ecg_record[0].transpose(1,0).shape)
+#                 numbers = re.findall(r'\d+', ecg_record[1]['comments'][2])
+#                 output_array = list(map(int, numbers))
+#                 for j in output_array:
+#                     if int(j) in classes:
+#                         output_array = j
+#                 if isinstance(output_array, list):
+#                     continue
+#                 y.append(output_array)
+#                 lx = []
+#                 for chan in range(ecg_record[0].shape[1]):
+#                     resampled_x, _ = wfdb.processing.resample_sig(ecg_record[0][:, chan], 500, 100)
+#                     lx.append(resampled_x)
+#                 dataset.append(ecg_record[0])
+#     dataset = np.array(dataset)
+#     print(dataset.shape)
+#     dataset = dataset.astype(np.double, copy=False)
+#     print(dataset.shape)
+#     X = torch.from_numpy(dataset[:, :, :])
+#     print(X.shape)
+#     for i in range(len(y)):
+#         y[i] = classes[y[i]]
+#     Y = torch.from_numpy(np.array(y))
+#     X = X[:, None, :, :]
+#     dataset_train = torch.utils.data.TensorDataset(X, Y)
 
-    return dataset_train
+#     return dataset_train
 
 
 
@@ -246,8 +246,8 @@ def main(args):
     
     # dataset_train = build_dataset(is_train=True, args=args)
     # dataset_val = build_dataset(is_train=False, args=args)
-    dataset_train = get_data(args.train_start, args.train_end)    # Training Data -
-    dataset_val = get_data(args.val_start, args.val_end)
+    dataset_train = CustomDataset(args.data_path, args.train_start, args.train_end)    # Training Data -
+    dataset_val = CustomDataset(args.data_path, args.val_start, args.val_end)
 
     if args.distributed is not None:  # args.distributed:
         num_tasks = misc.get_world_size()
@@ -324,10 +324,10 @@ def main(args):
         msg = model.load_state_dict(checkpoint_model, strict=False)
         print(msg)
 
-#        if args.global_pool:
-#            assert set(msg.missing_keys) == {'head.weight', 'head.bias', 'fc_norm.weight', 'fc_norm.bias'}
-#        else:
-        assert set(msg.missing_keys) == {'head.weight', 'head.bias'}
+        if args.global_pool:
+            assert set(msg.missing_keys) == {'head.weight', 'head.bias', 'fc_norm.weight', 'fc_norm.bias'}
+        else:
+            assert set(msg.missing_keys) == {'head.weight', 'head.bias'}
 
         # manually initialize fc layer
         trunc_normal_(model.head.weight, std=2e-5)
@@ -363,13 +363,13 @@ def main(args):
     optimizer = torch.optim.AdamW(param_groups, lr=args.lr)
     loss_scaler = NativeScaler()
 
-    if mixup_fn is not None:
-        # smoothing is handled with mixup label transform
-        criterion = SoftTargetCrossEntropy()
-    elif args.smoothing > 0.:
-        criterion = LabelSmoothingCrossEntropy(smoothing=args.smoothing)
-    else:
-        criterion = torch.nn.CrossEntropyLoss()
+    # if mixup_fn is not None:
+    #     # smoothing is handled with mixup label transform
+    #     criterion = SoftTargetCrossEntropy()
+    # elif args.smoothing > 0.:
+    #     criterion = LabelSmoothingCrossEntropy(smoothing=args.smoothing)
+    # else:
+    criterion = torch.nn.CrossEntropyLoss()
 
     print("criterion = %s" % str(criterion))
 

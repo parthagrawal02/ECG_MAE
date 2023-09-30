@@ -43,6 +43,7 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
     for data_iter_step, (samples, targets) in enumerate(metric_logger.log_every(data_loader, print_freq, header)):
 
         # we use a per iteration (instead of per epoch) lr scheduler
+        targets = targets[:, 0]
         if data_iter_step % accum_iter == 0:
             lr_sched.adjust_learning_rate(optimizer, data_iter_step / len(data_loader) + epoch, args)
 
@@ -59,6 +60,8 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
                 loss = criterion(outputs, targets)
         else:
             outputs = model(samples)
+            # print(outputs.size())
+            # print(targets.size())
             loss = criterion(outputs, targets)
 
         loss_value = loss.item()
@@ -114,6 +117,7 @@ def evaluate(data_loader, model, device, args):
     for batch in metric_logger.log_every(data_loader, 10, header):
         images = batch[0]
         target = batch[-1]
+        target = target[:, 0]
         if args.cuda is not None:
             images = images.to(device, non_blocking=True)
             target = target.to(device, non_blocking=True)
