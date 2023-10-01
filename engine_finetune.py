@@ -103,7 +103,6 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
     print("Averaged stats:", metric_logger)
     return {k: meter.global_avg for k, meter in metric_logger.meters.items()}
 
-
 @torch.no_grad()
 def evaluate(data_loader, model, device, args):
     criterion = torch.nn.CrossEntropyLoss()
@@ -131,9 +130,7 @@ def evaluate(data_loader, model, device, args):
             output = model(images)
             loss = criterion(output, target)
 
-
         acc1, acc5 = accuracy(output, target, topk=(1, 5))
-
         batch_size = images.shape[0]
         metric_logger.update(loss=loss.item())
         metric_logger.meters['acc1'].update(acc1.item(), n=batch_size)
@@ -142,5 +139,4 @@ def evaluate(data_loader, model, device, args):
     metric_logger.synchronize_between_processes()
     print('* Acc@1 {top1.global_avg:.3f} Acc@5 {top5.global_avg:.3f} loss {losses.global_avg:.3f}'
           .format(top1=metric_logger.acc1, top5=metric_logger.acc5, losses=metric_logger.loss))
-
     return {k: meter.global_avg for k, meter in metric_logger.meters.items()}

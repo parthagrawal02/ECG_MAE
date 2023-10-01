@@ -32,7 +32,6 @@ class VisionTransformer1(nn.Module):
                  embed_dim=128, depth=6, num_heads=8,
                  mlp_ratio=3., norm_layer=nn.LayerNorm, norm_pix_loss=False, num_classes = 10, global_pool=False):
         super().__init__()
-        self.global_pool = global_pool
         self.patch_embed = PatchEmbed(img_size, patch_size, in_chans, embed_dim)
         num_patches = self.patch_embed.num_patches
 
@@ -43,6 +42,8 @@ class VisionTransformer1(nn.Module):
             Block(embed_dim, num_heads, mlp_ratio, qkv_bias=True, norm_layer=norm_layer)
             for i in range(depth)])
         
+        self.global_pool = global_pool
+
         self.head =  nn.Linear(embed_dim, num_classes)
         self.fc_norm = norm_layer(embed_dim)
 
@@ -105,6 +106,7 @@ class VisionTransformer1(nn.Module):
         else:
             x = self.norm(x)
             outcome = self.head(x)
+            
         return outcome
 
 # Model architecture as described in the paper.

@@ -50,7 +50,6 @@ class MaskedAutoencoderViT(nn.Module):
             for i in range(depth)])
         self.norm = norm_layer(embed_dim)
         # --------------------------------------------------------------------------
-
         # --------------------------------------------------------------------------
         # MAE decoder specifics
         self.decoder_embed = nn.Linear(embed_dim, decoder_embed_dim, bias=True)
