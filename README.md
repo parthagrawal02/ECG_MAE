@@ -20,7 +20,7 @@ python main_pretrain.py \
 
 data_path to the physionet -
 
-Eg. if path to the physionet dataset is 
+Eg. if path to the physionet dataset is
 
 /Users/parthagrawal02/Desktop/ECG_CNN/physionet/WFDBRecords
 
@@ -29,7 +29,7 @@ then --datapath '/Users/parthagrawal02/Desktop/ECG_CNN/physionet'
 To Finetune :
 
 ```
-!python /kaggle/working/ECG_MAE/main_finetune.py\
+python /kaggle/working/ECG_MAE/main_finetune.py\
     --model vit_1dcnn \
     --finetune '/checkpoint-360.pth' \
     --epochs 70 \
