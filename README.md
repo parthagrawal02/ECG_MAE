@@ -39,4 +39,4 @@ To Finetune :
     --val_start 37 --val_end 41 --train_start 0 --train_end 37
 ```
 
-Change ecg_dataloader according to the dataset
+Modify ecg_dataloader according to the dataset
