@@ -54,8 +54,12 @@ class CustomDataset(Dataset):
         for chan in range(ecg_record[0].shape[1]):
             resampled_x, _ = wfdb.processing.resample_sig(ecg_record[0][:, chan], 500, 100)
             lx.append(resampled_x)
+
         class_id = self.class_map[class_name]
         ecg_tensor = torch.from_numpy(np.array(lx))
         img_tensor = ecg_tensor[None, :, :]
+        mean = img_tensor.mean(dim=-1, keepdim=True)
+        var = img_tensor.var(dim=-1, keepdim=True)
+        img_tensor = (img_tensor - mean) / (var + 1.e-6)**.5
         class_id = torch.tensor([class_id])
         return img_tensor, class_id

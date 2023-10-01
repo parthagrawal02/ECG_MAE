@@ -107,7 +107,7 @@ class VisionTransformer1(nn.Module):
             x = self.norm(x)
             outcome = self.head(x)
         return outcome
-    
+
 # Model architecture as described in the paper.
 def vit_1dcnn(**kwargs):
     model = VisionTransformer1(
