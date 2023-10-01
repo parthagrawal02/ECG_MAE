@@ -105,8 +105,8 @@ def get_args_parser():
     # distributed training parameters
     parser.add_argument('--world_size', default=1, type=int,
                         help='number of distributed processes')
-    parser.add_argument('--start', default=1, type=int)
-    parser.add_argument('--end', default=3, type=int)
+    parser.add_argument('--start', default=0, type=int)
+    parser.add_argument('--end', default=46, type=int)
 
 
     parser.add_argument('--local_rank', default=-1, type=int)

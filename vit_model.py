@@ -66,13 +66,12 @@ class VisionTransformer1(nn.Module):
         return x
 
     def unpatchify(self, x):
-        """
+        """ 
         x: (N, L, patch_size_height*patch_size_width*1)
         imgs: (N, 1, H, W) - 12 channel ECG - H = No. of channels, W = Length of ECG signal (1000 in this case)
         """
         ph = self.patch_embed.patch_size[0]
         pw = self.patch_embed.patch_size[1]
-
         # h = w = int(x.shape[1]**.5)
         # assert h * w == x.shape[1]
         h = 12
