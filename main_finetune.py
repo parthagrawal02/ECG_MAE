@@ -167,6 +167,8 @@ def get_args_parser():
                         help='url used to set up distributed training')
     parser.add_argument('--cuda', default=None,
                         help='url used to set up distributed training')
+    parser.add_argument('--data_split', default=0.8, type= float,
+                        help='url used to set up distributed training')
 
 
     return parser
@@ -244,8 +246,10 @@ def main(args):
     
     # dataset_train = build_dataset(is_train=True, args=args)
     # dataset_val = build_dataset(is_train=False, args=args)
-    dataset_train = CustomDataset(args.data_path, args.train_start, args.train_end)    # Training Data -
-    dataset_val = CustomDataset(args.data_path, args.val_start, args.val_end)
+    full_dataset = CustomDataset(args.data_path, args.train_start, args.train_end)    # Training Data -
+    train_size = int(args.data_split * len(full_dataset))
+    val_size = len(full_dataset) - train_size
+    dataset_train, dataset_val = torch.utils.data.random_split(full_dataset, [train_size, val_size])
 
     if args.distributed is not None:  # args.distributed:
         num_tasks = misc.get_world_size()
@@ -267,7 +271,7 @@ def main(args):
         sampler_train = torch.utils.data.RandomSampler(dataset_train)
         sampler_val = torch.utils.data.SequentialSampler(dataset_val)
 
-    if global_rank == 0 and args.log_dir is not None and not args.eval:
+    if args.log_dir is not None and not args.eval:
         os.makedirs(args.log_dir, exist_ok=True)
         log_writer = SummaryWriter(log_dir=args.log_dir)
     else:
@@ -314,7 +318,7 @@ def main(args):
             if k in checkpoint_model and checkpoint_model[k].shape != state_dict[k].shape:
                 print(f"Removing key {k} from pretrained checkpoint")
                 del checkpoint_model[k]
-        print(checkpoint_model)
+        # print(checkpoint_model)
         # interpolate position embedding
         interpolate_pos_embed(model, checkpoint_model)
 
@@ -387,12 +391,11 @@ def main(args):
     for epoch in range(args.start_epoch, args.epochs):
         if args.distributed:
             data_loader_train.sampler.set_epoch(epoch)
-        # To enable cuda, use set cuda = True
         train_stats = train_one_epoch(
             model, criterion, data_loader_train,
             optimizer, device, epoch, loss_scaler,
             args.clip_grad, mixup_fn,
-            log_writer=None,
+            log_writer=log_writer,
             args=args
         )
         if args.output_dir:
