@@ -36,7 +36,7 @@ python /kaggle/working/ECG_MAE/main_finetune.py\
     --lr 5e-3 \
     --data_path /Users/parthagrawal02/Desktop/ECG_CNN/physionet \
     --cuda 'CUDA'\
-    --val_start 37 --val_end 41 --train_start 0 --train_end 37
+    --train_start 0 --train_end 46 --data_split 0.85
 ```
 
 Modify ecg_dataloader according to the dataset
