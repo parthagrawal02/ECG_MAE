@@ -43,7 +43,6 @@ class CustomDataset(Dataset):
                         continue
                     y.append(output_array)
                     self.data.append([filepath, output_array])
-        
     def __len__(self):
         return len(self.data)
     
