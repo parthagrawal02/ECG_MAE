@@ -3,3 +3,7 @@ output_dir/
 __pycache__/
 output_dir_fin/
 output_dir_fin_f90/
+fin_0_40k/
+fin_360_40k/
+fin_0_40k/
+checkpoint-86.pth/
