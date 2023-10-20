@@ -118,11 +118,9 @@ def get_args_parser():
                         help='train start')
     parser.add_argument('--train_end',type=int, default=40,
                         help='train end')
-
-
-
+    parser.add_argument('--classf_type',type=str, default="multi_label",
+                        help='classification type')
     return parser
-
 
 def main(args):
     misc.init_distributed_mode(args)
@@ -232,6 +230,7 @@ def main(args):
     # for linear prob only
     # hack: revise model's head with BN
     model.head = torch.nn.Sequential(torch.nn.BatchNorm1d(model.head.in_features, affine=False, eps=1e-6), model.head)
+
     # freeze all but the head
     for _, p in model.named_parameters():
         p.requires_grad = False
@@ -266,7 +265,7 @@ def main(args):
     print(optimizer)
     loss_scaler = NativeScaler()
 
-    criterion = torch.nn.CrossEntropyLoss()
+    criterion = torch.nn.BCEWithLogitsLoss()
 
     print("criterion = %s" % str(criterion))
 
