@@ -30,8 +30,9 @@ class VisionTransformer1(nn.Module):
     """
     def __init__(self, img_size=(12, 1000), patch_size=(1, 50), in_chans=1,
                  embed_dim=128, depth=6, num_heads=8,
-                 mlp_ratio=3., norm_layer=nn.LayerNorm, norm_pix_loss=False, num_classes = 10, global_pool=False):
+                 mlp_ratio=3., norm_layer=nn.LayerNorm, norm_pix_loss=False, num_classes = 10, global_pool=False, drop_rate = 0):
         super().__init__()
+        use_fc_norm = global_pool
         self.patch_embed = PatchEmbed(img_size, patch_size, in_chans, embed_dim)
         num_patches = self.patch_embed.num_patches
 
@@ -43,9 +44,20 @@ class VisionTransformer1(nn.Module):
             for i in range(depth)])
         
         self.global_pool = global_pool
+        self.norm = norm_layer(embed_dim) if not use_fc_norm else nn.Identity()
+        # if global_pool == 'map':
+        #     self.attn_pool = AttentionPoolLatent(
+        #         self.embed_dim,
+        #         num_heads=num_heads,
+        #         mlp_ratio=mlp_ratio,
+        #         norm_layer=norm_layer,
+        #     )
+        # else:
+        #     self.attn_pool = None
+        self.fc_norm = norm_layer(embed_dim) if use_fc_norm else nn.Identity()
+        self.head_drop = nn.Dropout(drop_rate)
+        self.head = nn.Linear(embed_dim, num_classes) if num_classes > 0 else nn.Identity()
 
-        self.head =  nn.Linear(embed_dim, num_classes)
-        self.fc_norm = norm_layer(embed_dim)
 
     @torch.jit.ignore
     def no_weight_decay(self):
@@ -102,10 +114,14 @@ class VisionTransformer1(nn.Module):
 
         if self.global_pool:
             x = x[:, 1:, :].mean(dim=1)  # global pool without cls token
-            outcome = self.head(self.fc_norm(x))
+            # outcome = self.fc_norm(x)
         else:
             x = self.norm(x)
-            outcome = self.head(x)
+            x = x[:, 0]
+        x = self.fc_norm(x)
+        x = self.head_drop(x)
+        return self.head(x)
+
             
         return outcome
 

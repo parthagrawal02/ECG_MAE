@@ -41,7 +41,7 @@ from engine_finetune import train_one_epoch, evaluate
 
 
 def get_args_parser():
-    parser = argparse.ArgumentParser('MAE fine-tuning for image classification', add_help=False)
+    parser = argparse.ArgumentParser('MAE fine-tuning for ECG classification', add_help=False)
     parser.add_argument('--batch_size', default=64, type=int,
                         help='Batch size per GPU (effective batch size is batch_size * accum_iter * # gpus')
     parser.add_argument('--epochs', default=50, type=int)
@@ -61,6 +61,7 @@ def get_args_parser():
     # Optimizer parameters
     parser.add_argument('--clip_grad', type=float, default=None, metavar='NORM',
                         help='Clip gradient norm (default: None, no clipping)')
+    
     parser.add_argument('--weight_decay', type=float, default=0.05,
                         help='weight decay (default: 0.05)')
 
@@ -129,7 +130,7 @@ def get_args_parser():
                         help='Use class token instead of global pool for classification')
 
     # Dataset parameters
-    parser.add_argument('--data_path', default='/Users/parthagrawal02/Desktop/Carelog/ECG_CNN', type=str,
+    parser.add_argument('--data_path', default='/Users/parthagrawal02/Desktop/Carelog/ECG_CNN/physionet', type=str,
                         help='dataset path')
     parser.add_argument('--nb_classes', default=10, type=int,
                         help='number of the classification types')
@@ -284,7 +285,6 @@ def main(args):
         pin_memory=args.pin_mem,
         drop_last=True,
     )
-
     data_loader_val = torch.utils.data.DataLoader(
         dataset_val, sampler=sampler_val,
         batch_size=args.batch_size,
@@ -292,7 +292,6 @@ def main(args):
         pin_memory=args.pin_mem,
         drop_last=False
     )
-
     mixup_fn = None
     mixup_active = args.mixup > 0 or args.cutmix > 0. or args.cutmix_minmax is not None
     if mixup_active:

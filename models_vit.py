@@ -57,3 +57,9 @@ def vit_ecg_patch_50(**kwargs):
         patch_size=(1, 50), embed_dim=128, depth=6, num_heads=8,
         mlp_ratio=3, qkv_bias=True, norm_layer=partial(nn.LayerNorm, eps=1e-6), **kwargs)
     return model
+
+def vit_1dcnn(**kwargs):
+    model = VisionTransformer(
+        patch_size=(1, 50), embed_dim=128, depth=6, num_heads=8,
+        mlp_ratio=3, qkv_bias=True, norm_layer=partial(nn.LayerNorm, eps=1e-6), **kwargs)
+    return model
