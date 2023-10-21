@@ -11,18 +11,6 @@ import pandas as pd
 class CustomDataset(Dataset):
 
     def __init__(self, data_path: str = "", start: int = 0, end: int = 46):
-        self.class_map  = {
-        426177001: 1,
-        426783006: 2,
-        164889003: 3,
-        427084000: 4,
-        164890007: 5,
-        427393009: 6,
-        426761007: 7,
-        713422000: 8,
-        233896004: 9,
-        233897008: 0
-        }
         self.data_path = data_path
         self.data = []
         y = []

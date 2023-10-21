@@ -22,6 +22,11 @@ import torch.backends.cudnn as cudnn
 from torch.utils.tensorboard import SummaryWriter
 import torchvision.transforms as transforms
 import torchvision.datasets as datasets
+import pandas as pd
+import numpy as np
+import wfdb
+import ast
+import torch
 
 import timm
 
@@ -150,10 +155,70 @@ def main(args):
     #         transforms.ToTensor(),
     #         transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])])
 
-    full_dataset = CustomDataset(args.data_path, args.train_start, args.train_end)    # Training Data -
-    train_size = int(args.data_split * len(full_dataset))
-    val_size = len(full_dataset) - train_size
-    dataset_train, dataset_val = torch.utils.data.random_split(full_dataset, [train_size, val_size])
+    def load_raw_data(df, sampling_rate, path):
+        if(sampling_rate == 100):
+            data = [wfdb.rdsamp(path + f) for f in df.filename_lr]
+        else:
+            data = [wfdb.rdsamp(path + f) for f in df.filename_hr]
+        data = np.array([signal for signal, meta in data])
+        return data
+
+
+    path = "ptb_xl/"
+    sampling_rate = 100
+
+    # load and convert annotation data
+    Y = pd.read_csv(path+'ptbxl_database.csv', index_col='ecg_id')
+    Y.scp_codes = Y.scp_codes.apply(lambda x: ast.literal_eval(x))
+
+    # Load raw signal data
+    X = load_raw_data(Y, sampling_rate, path)
+
+    # Load scp_statements.csv for diagnostic aggregation
+    agg_df = pd.read_csv(path+'scp_statements.csv', index_col=0)
+    agg_df = agg_df[agg_df.diagnostic == 1]
+
+    def aggregate_diagnostic(y_dic):
+        tmp = []
+        for key in y_dic.keys():
+            if key in agg_df.index:
+                tmp.append(agg_df.loc[key].diagnostic_class)
+        return list(set(tmp))
+
+    # Apply diagnostic superclass
+    Y['diagnostic_superclass'] = Y.scp_codes.apply(aggregate_diagnostic)
+
+    # Split data into train and test
+    test_fold = 10
+    # Train
+    X_train = X[np.where(Y.strat_fold != test_fold)]
+    y_train = Y[(Y.strat_fold != test_fold)].diagnostic_superclass
+    # Test
+    X_test = X[np.where(Y.strat_fold == test_fold)]
+    y_test = Y[Y.strat_fold == test_fold].diagnostic_superclass
+
+    def multihot_encoder(labels, n_categories = 1, dtype=torch.float32):
+        label_set = set()
+        for label_list in labels:
+            label_set = label_set.union(set(label_list))
+        label_set = sorted(label_set)
+
+        multihot_vectors = []
+        for label_list in labels:
+            multihot_vectors.append([1 if x in label_list else 0 for x in label_set])
+        if dtype is None:
+            return pd.DataFrame(multihot_vectors, columns=label_set)
+        return torch.Tensor(multihot_vectors).to(dtype)
+
+    y_train = multihot_encoder(y_train, n_categories = 5)
+    y_test = multihot_encoder(y_test, n_categories= 5)
+    dataset_train = torch.utils.data.TensorDataset(torch.tensor(X_train.transpose(0, 2, 1)[:, None, :, :]), torch.tensor(y_train))
+    dataset_val = torch.utils.data.TensorDataset(torch.tensor(X_test.transpose(0, 2, 1)[:, None, :, :]), torch.tensor(y_test))
+    
+    # full_dataset = CustomDataset(args.data_path, args.train_start, args.train_end)    # Training Data -
+    # train_size = int(args.data_split * len(full_dataset))
+    # val_size = len(full_dataset) - train_size
+    # dataset_train, dataset_val = torch.utils.data.random_split(full_dataset, [train_size, val_size])
 
     if args.distributed is not None:  # args.distributed:
         num_tasks = misc.get_world_size()
@@ -272,7 +337,7 @@ def main(args):
     misc.load_model(args=args, model_without_ddp=model_without_ddp, optimizer=optimizer, loss_scaler=loss_scaler)
 
     if args.eval:
-        test_stats = evaluate(data_loader_val, model, device)
+        test_stats = evaluate(data_loader_val, model, device, args)
         print(f"Accuracy of the network on the {len(dataset_val)} test images: {test_stats['acc1']:.1f}%")
         exit(0)
 
@@ -301,7 +366,7 @@ def main(args):
 
         if log_writer is not None:
             log_writer.add_scalar('perf/test_acc1', test_stats['acc1'], epoch)
-            log_writer.add_scalar('perf/test_acc5', test_stats['acc5'], epoch)
+            # log_writer.add_scalar('perf/test_acc5', test_stats['acc5'], epoch)
             log_writer.add_scalar('perf/test_loss', test_stats['loss'], epoch)
 
         log_stats = {**{f'train_{k}': v for k, v in train_stats.items()},

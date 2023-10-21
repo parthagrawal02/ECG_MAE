@@ -20,7 +20,7 @@ from timm.utils import accuracy
 
 import utils.misc as misc
 import utils.lr_sched as lr_sched
-
+from sklearn.metrics import accuracy_score
 
 def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
                     data_loader: Iterable, optimizer: torch.optim.Optimizer,
@@ -43,7 +43,8 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
     for data_iter_step, (samples, targets) in enumerate(metric_logger.log_every(data_loader, print_freq, header)):
 
         # we use a per iteration (instead of per epoch) lr scheduler
-        targets = targets[:, 0]
+        if(args.classf_type != "multi_label"):
+            targets = targets[:, 0]
         if data_iter_step % accum_iter == 0:
             lr_sched.adjust_learning_rate(optimizer, data_iter_step / len(data_loader) + epoch, args)
 
@@ -105,7 +106,7 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
 
 @torch.no_grad()
 def evaluate(data_loader, model, device, args):
-    criterion = torch.nn.CrossEntropyLoss()
+    criterion = torch.nn.BCEWithLogitsLoss()
 
     metric_logger = misc.MetricLogger(delimiter="  ")
     header = 'Test:'
@@ -116,7 +117,8 @@ def evaluate(data_loader, model, device, args):
     for batch in metric_logger.log_every(data_loader, 10, header):
         images = batch[0]
         target = batch[-1]
-        target = target[:, 0]
+        if(args.classf_type != "multi_label"):
+            target = target[:, 0]
         if args.cuda is not None:
             images = images.to(device, non_blocking=True)
             target = target.to(device, non_blocking=True)
@@ -129,14 +131,21 @@ def evaluate(data_loader, model, device, args):
         else:
             output = model(images)
             loss = criterion(output, target)
+        if(args.classf_type != "multi_label"):
+            acc1, acc5 = accuracy(output, target, topk=(1, 5))
+            batch_size = images.shape[0]
+            metric_logger.update(loss=loss.item())
+            metric_logger.meters['acc1'].update(acc1.item(), n=batch_size)
+            metric_logger.meters['acc5'].update(acc5.item(), n=batch_size)
+        else:
+            acc1 = accuracy_score(target, torch.sigmoid(output) > 0.5)*100
+            batch_size = images.shape[0]
+            metric_logger.update(loss=loss.item())
+            metric_logger.meters['acc1'].update(acc1.item(), n=batch_size)
 
-        acc1, acc5 = accuracy(output, target, topk=(1, 5))
-        batch_size = images.shape[0]
-        metric_logger.update(loss=loss.item())
-        metric_logger.meters['acc1'].update(acc1.item(), n=batch_size)
-        metric_logger.meters['acc5'].update(acc5.item(), n=batch_size)
+
     # gather the stats from all processes
     metric_logger.synchronize_between_processes()
-    print('* Acc@1 {top1.global_avg:.3f} Acc@5 {top5.global_avg:.3f} loss {losses.global_avg:.3f}'
-          .format(top1=metric_logger.acc1, top5=metric_logger.acc5, losses=metric_logger.loss))
+    print('* Acc@1 {top1.global_avg:.3f} loss {losses.global_avg:.3f}'
+          .format(top1=metric_logger.acc1, losses=metric_logger.loss))
     return {k: meter.global_avg for k, meter in metric_logger.meters.items()}
