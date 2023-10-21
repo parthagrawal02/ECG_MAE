@@ -119,6 +119,8 @@ def get_args_parser():
                         help='url used to set up distributed training')
     parser.add_argument('--data_split', default=0.8, type= float,
                         help='url used to set up distributed training')
+    parser.add_argument('--mode',type=str, default="linprobe",
+                        help='Finetuning or Linear Eval')
     parser.add_argument('--train_start',type=int, default=31,
                         help='train start')
     parser.add_argument('--train_end',type=int, default=40,
@@ -305,10 +307,11 @@ def main(args):
     model.head = torch.nn.Sequential(torch.nn.BatchNorm1d(model.head.in_features, affine=False, eps=1e-6), model.head)
 
     # freeze all but the head
-    for _, p in model.named_parameters():
-        p.requires_grad = False
-    for _, p in model.head.named_parameters():
-        p.requires_grad = True
+    if(args.mode == "linprobe"):
+        for _, p in model.named_parameters():
+            p.requires_grad = False
+        for _, p in model.head.named_parameters():
+            p.requires_grad = True
     model = model.double()
     if args.cuda is not None:
         model.to(device)
