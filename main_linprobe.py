@@ -209,6 +209,14 @@ def main(args):
         if dtype is None:
             return pd.DataFrame(multihot_vectors, columns=label_set)
         return torch.Tensor(multihot_vectors).to(dtype)
+    X_train = torch.tensor(X_train)
+    mean = X_train.mean(dim=-2, keepdim=True)
+    var = X_train.var(dim=-2, keepdim=True)
+    X_train = (X_train - mean) / (var + 1.e-6)**.5
+    X_test = torch.tensor(X_test)
+    mean = X_test.mean(dim=-2, keepdim=True)
+    var = X_test.var(dim=-2, keepdim=True)
+    X_test = (X_test - mean) / (var + 1.e-6)**.5
 
     y_train = multihot_encoder(y_train, n_categories = 5)
     y_test = multihot_encoder(y_test, n_categories= 5)
