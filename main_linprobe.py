@@ -209,19 +209,19 @@ def main(args):
         if dtype is None:
             return pd.DataFrame(multihot_vectors, columns=label_set)
         return torch.Tensor(multihot_vectors).to(dtype)
-    X_train = torch.tensor(X_train)
-    mean = X_train.mean(dim=-2, keepdim=True)
-    var = X_train.var(dim=-2, keepdim=True)
+    X_train = torch.tensor(X_train.transpose(0, 2, 1))
+    mean = X_train.mean(dim=-1, keepdim=True)
+    var = X_train.var(dim=-1, keepdim=True)
     X_train = (X_train - mean) / (var + 1.e-6)**.5
-    X_test = torch.tensor(X_test)
-    mean = X_test.mean(dim=-2, keepdim=True)
-    var = X_test.var(dim=-2, keepdim=True)
+    X_test = torch.tensor(X_test.transpose(0, 2, 1))
+    mean = X_test.mean(dim=-1, keepdim=True)
+    var = X_test.var(dim=-1, keepdim=True)
     X_test = (X_test - mean) / (var + 1.e-6)**.5
 
     y_train = multihot_encoder(y_train, n_categories = 5)
     y_test = multihot_encoder(y_test, n_categories= 5)
-    dataset_train = torch.utils.data.TensorDataset(torch.tensor(X_train.transpose(0, 2, 1)[:, None, :, :]), torch.tensor(y_train))
-    dataset_val = torch.utils.data.TensorDataset(torch.tensor(X_test.transpose(0, 2, 1)[:, None, :, :]), torch.tensor(y_test))
+    dataset_train = torch.utils.data.TensorDataset(torch.tensor(X_train[:, None, :, :]), torch.tensor(y_train))
+    dataset_val = torch.utils.data.TensorDataset(torch.tensor(X_test[:, None, :, :]), torch.tensor(y_test))
     
     # full_dataset = CustomDataset(args.data_path, args.train_start, args.train_end)    # Training Data -
     # train_size = int(args.data_split * len(full_dataset))
