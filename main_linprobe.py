@@ -164,7 +164,7 @@ def main(args):
         return data
 
 
-    path = "ptb_xl/"
+    path = args.data_path
     sampling_rate = 100
 
     # load and convert annotation data
