@@ -10,6 +10,7 @@
 # --------------------------------------------------------
 
 import argparse
+import pandas as pd
 import datetime
 import json
 import numpy as np
@@ -23,7 +24,7 @@ import re
 import torch.backends.cudnn as cudnn
 from torch.utils.tensorboard import SummaryWriter
 import timm
-
+import ast
 # assert timm.__version__ == "0.3.2" # version check
 from timm.models.layers import trunc_normal_
 from timm.data.mixup import Mixup
@@ -119,6 +120,13 @@ def get_args_parser():
                         help='train start')
     parser.add_argument('--train_end',type=int, default=40,
                         help='train end')
+    parser.add_argument('--data',type=str, default=" ",
+                        help='Which dataset')
+    parser.add_argument('--classf_type',type=str, default="multi_label",
+                        help='Which Classification')
+    parser.add_argument('--mode',type=str, default="finetune",
+                        help='Which Classification')
+
 
 
     # * Finetuning params
@@ -245,12 +253,87 @@ def main(args):
     if args.cuda is not None:
         cudnn.benchmark = True
     
-    # dataset_train = build_dataset(is_train=True, args=args)
-    # dataset_val = build_dataset(is_train=False, args=args)
-    full_dataset = CustomDataset(args.data_path, args.train_start, args.train_end)    # Training Data -
-    train_size = int(args.data_split * len(full_dataset))
-    val_size = len(full_dataset) - train_size
-    dataset_train, dataset_val = torch.utils.data.random_split(full_dataset, [train_size, val_size])
+    
+    if args.data == "PTB":
+        def load_raw_data(df, sampling_rate, path):
+            if(sampling_rate == 100):
+                data = [wfdb.rdsamp(path + f) for f in df.filename_lr]
+            else:
+                data = [wfdb.rdsamp(path + f) for f in df.filename_hr]
+            data = np.array([signal for signal, meta in data])
+            return data
+        path = args.data_path
+        sampling_rate = 100
+
+        # load and convert annotation data
+        Y = pd.read_csv(path+'ptbxl_database.csv', index_col='ecg_id')
+        Y.scp_codes = Y.scp_codes.apply(lambda x: ast.literal_eval(x))
+
+        # Load raw signal data
+        X = load_raw_data(Y, sampling_rate, path)
+
+        # Load scp_statements.csv for diagnostic aggregation
+        agg_df = pd.read_csv(path+'scp_statements.csv', index_col=0)
+        agg_df = agg_df[agg_df.diagnostic == 1]
+
+        def aggregate_diagnostic(y_dic):
+            tmp = []
+            for key in y_dic.keys():
+                if key in agg_df.index:
+                    tmp.append(agg_df.loc[key].diagnostic_class)
+            return list(set(tmp))
+
+        # Apply diagnostic superclass
+        Y['diagnostic_superclass'] = Y.scp_codes.apply(aggregate_diagnostic)
+
+        # Split data into train and test
+        test_fold = 10
+        # Train
+        X_train = X[np.where(Y.strat_fold != test_fold)]
+        y_train = Y[(Y.strat_fold != test_fold)].diagnostic_superclass
+        # Test
+        X_test = X[np.where(Y.strat_fold == test_fold)]
+        y_test = Y[Y.strat_fold == test_fold].diagnostic_superclass
+
+        def multihot_encoder(labels, n_categories = 1, dtype=torch.float32):
+            label_set = set()
+            for label_list in labels:
+                label_set = label_set.union(set(label_list))
+            label_set = sorted(label_set)
+
+            multihot_vectors = []
+            for label_list in labels:
+                multihot_vectors.append([1 if x in label_list else 0 for x in label_set])
+            if dtype is None:
+                return pd.DataFrame(multihot_vectors, columns=label_set)
+            return torch.Tensor(multihot_vectors).to(dtype)
+        X_train = torch.tensor(X_train.transpose(0, 2, 1))
+        # mean = X_train.mean(dim=-1, keepdim=True)
+        # var = X_train.var(dim=-1, keepdim=True)
+        # X_train = (X_train - mean) / (var + 1.e-6)**.5
+        X_test = torch.tensor(X_test.transpose(0, 2, 1))
+        # mean = X_test.mean(dim=-1, keepdim=True)
+        # var = X_test.var(dim=-1, keepdim=True)
+        # X_test = (X_test - mean) / (var + 1.e-6)**.5
+
+        y_train = multihot_encoder(y_train, n_categories = 5)
+        y_test = multihot_encoder(y_test, n_categories= 5)
+        dataset_train = torch.utils.data.TensorDataset(torch.tensor(X_train[:, None, :, :]), torch.tensor(y_train))
+        dataset_val = torch.utils.data.TensorDataset(torch.tensor(X_test[:, None, :, :]), torch.tensor(y_test))
+
+
+
+
+    else:
+        # dataset_train = build_dataset(is_train=True, args=args)
+        # dataset_val = build_dataset(is_train=False, args=args)
+        full_dataset = CustomDataset(args.data_path, args.train_start, args.train_end)    # Training Data -
+        train_size = int(args.data_split * len(full_dataset))
+        val_size = len(full_dataset) - train_size
+        dataset_train, dataset_val = torch.utils.data.random_split(full_dataset, [train_size, val_size])
+    
+    
+
 
     if args.distributed is not None:  # args.distributed:
         num_tasks = misc.get_world_size()
@@ -332,7 +415,13 @@ def main(args):
 
         # manually initialize fc layer
         trunc_normal_(model.head.weight, std=2e-5)
-        
+
+    if(args.mode == "linprobe"):
+        for _, p in model.named_parameters():
+            p.requires_grad = False
+        for _, p in model.head.named_parameters():
+            p.requires_grad = True
+    
     model = model.double()
     if args.cuda is not None:
         model.to(device)
@@ -370,7 +459,10 @@ def main(args):
     # elif args.smoothing > 0.:
     #     criterion = LabelSmoothingCrossEntropy(smoothing=args.smoothing)
     # else:
-    criterion = torch.nn.CrossEntropyLoss()
+    if args.classf_type == "multi_label":
+        criterion = torch.nn.BCEWithLogitsLoss()
+    else:
+        criterion = torch.nn.CrossEntropyLoss()
 
     print("criterion = %s" % str(criterion))
 
@@ -409,7 +501,7 @@ def main(args):
 
         if log_writer is not None:
             log_writer.add_scalar('perf/test_acc1', test_stats['acc1'], epoch)
-            log_writer.add_scalar('perf/test_acc5', test_stats['acc5'], epoch)
+            # log_writer.add_scalar('perf/test_acc5', test_stats['acc5'], epoch)
             log_writer.add_scalar('perf/test_loss', test_stats['loss'], epoch)
 
         log_stats = {**{f'train_{k}': v for k, v in train_stats.items()},
