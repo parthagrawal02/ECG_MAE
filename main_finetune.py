@@ -14,6 +14,12 @@ import pandas as pd
 import datetime
 import json
 import numpy as np
+from utils import utils
+import pandas as pd
+import ast
+import wfdb
+import numpy as np
+
 import os
 import time
 from pathlib import Path
@@ -253,8 +259,47 @@ def main(args):
     if args.cuda is not None:
         cudnn.benchmark = True
     
-    
     if args.data == "PTB":
+        # def load_raw_data(df, sampling_rate, path):
+        #     if(sampling_rate == 100):
+        #         data = [wfdb.rdsamp(path + f) for f in df.filename_lr]
+        #     else:
+        #         data = [wfdb.rdsamp(path + f) for f in df.filename_hr]
+        #     data = np.array([signal for signal, meta in data])
+        #     return data
+        # path = args.data_path
+        # sampling_rate = 100
+
+        # # load and convert annotation data
+        # Y = pd.read_csv(path+'ptbxl_database.csv', index_col='ecg_id')
+        # Y.scp_codes = Y.scp_codes.apply(lambda x: ast.literal_eval(x))
+
+        # # Load raw signal data
+        # X = load_raw_data(Y, sampling_rate, path)
+
+        # # Load scp_statements.csv for diagnostic aggregation
+        # agg_df = pd.read_csv(path+'scp_statements.csv', index_col=0)
+        # agg_df = agg_df[agg_df.diagnostic == 1]
+
+        # def aggregate_diagnostic(y_dic):
+        #     tmp = []
+        #     for key in y_dic.keys():
+        #         if key in agg_df.index:
+        #             tmp.append(agg_df.loc[key].diagnostic_class)
+        #     return list(set(tmp))
+
+        # # Apply diagnostic superclass
+        # Y['diagnostic_superclass'] = Y.scp_codes.apply(aggregate_diagnostic)
+
+        # # Split data into train and test
+        # test_fold = 10
+        # # Train
+        # X_train = X[np.where(Y.strat_fold != test_fold)]
+        # y_train = Y[(Y.strat_fold != test_fold)].diagnostic_superclass
+        # # Test
+        # X_test = X[np.where(Y.strat_fold == test_fold)]
+        # y_test = Y[Y.strat_fold == test_fold].diagnostic_superclass
+
         def load_raw_data(df, sampling_rate, path):
             if(sampling_rate == 100):
                 data = [wfdb.rdsamp(path + f) for f in df.filename_lr]
@@ -262,67 +307,43 @@ def main(args):
                 data = [wfdb.rdsamp(path + f) for f in df.filename_hr]
             data = np.array([signal for signal, meta in data])
             return data
-        path = args.data_path
-        sampling_rate = 100
 
-        # load and convert annotation data
-        Y = pd.read_csv(path+'ptbxl_database.csv', index_col='ecg_id')
-        Y.scp_codes = Y.scp_codes.apply(lambda x: ast.literal_eval(x))
+
+        sampling_frequency=100
+        datafolder=args.data_path
+        task='superdiagnostic'
+        outputfolder='/output/'
+
+        # Load PTB-XL data
+        raw_labels = pd.read_csv(datafolder+'ptbxl_database.csv', index_col='ecg_id')
+        raw_labels.scp_codes = raw_labels.scp_codes.apply(lambda x: ast.literal_eval(x))
 
         # Load raw signal data
-        X = load_raw_data(Y, sampling_rate, path)
+        data = load_raw_data(raw_labels, sampling_frequency, datafolder)
 
-        # Load scp_statements.csv for diagnostic aggregation
-        agg_df = pd.read_csv(path+'scp_statements.csv', index_col=0)
-        agg_df = agg_df[agg_df.diagnostic == 1]
+        # data, raw_labels = utils.load_dataset(datafolder, sampling_frequency)
+        # Preprocess label data
+        labels = utils.compute_label_aggregations(raw_labels, datafolder, task)
+        # Select relevant data and convert to one-hot
+        data, labels, Y, _ = utils.select_data(data, labels, task, min_samples=0, outputfolder=outputfolder)
 
-        def aggregate_diagnostic(y_dic):
-            tmp = []
-            for key in y_dic.keys():
-                if key in agg_df.index:
-                    tmp.append(agg_df.loc[key].diagnostic_class)
-            return list(set(tmp))
+        # 1-9 for training 
+        X_train = data[labels.strat_fold < 10]
+        y_train = Y[labels.strat_fold < 10]
+        # 10 for validation
+        X_test = data[labels.strat_fold == 10]
+        y_test = Y[labels.strat_fold == 10]
 
-        # Apply diagnostic superclass
-        Y['diagnostic_superclass'] = Y.scp_codes.apply(aggregate_diagnostic)
-
-        # Split data into train and test
-        test_fold = 10
-        # Train
-        X_train = X[np.where(Y.strat_fold != test_fold)]
-        y_train = Y[(Y.strat_fold != test_fold)].diagnostic_superclass
-        # Test
-        X_test = X[np.where(Y.strat_fold == test_fold)]
-        y_test = Y[Y.strat_fold == test_fold].diagnostic_superclass
-
-        def multihot_encoder(labels, n_categories = 1, dtype=torch.float32):
-            label_set = set()
-            for label_list in labels:
-                label_set = label_set.union(set(label_list))
-            label_set = sorted(label_set)
-
-            multihot_vectors = []
-            for label_list in labels:
-                multihot_vectors.append([1 if x in label_list else 0 for x in label_set])
-            if dtype is None:
-                return pd.DataFrame(multihot_vectors, columns=label_set)
-            return torch.Tensor(multihot_vectors).to(dtype)
         X_train = torch.tensor(X_train.transpose(0, 2, 1))
-        # mean = X_train.mean(dim=-1, keepdim=True)
-        # var = X_train.var(dim=-1, keepdim=True)
-        # X_train = (X_train - mean) / (var + 1.e-6)**.5
+        mean = X_train.mean(dim=-1, keepdim=True)
+        var = X_train.var(dim=-1, keepdim=True)
+        X_train = (X_train - mean) / (var + 1.e-6)**.5
         X_test = torch.tensor(X_test.transpose(0, 2, 1))
-        # mean = X_test.mean(dim=-1, keepdim=True)
-        # var = X_test.var(dim=-1, keepdim=True)
-        # X_test = (X_test - mean) / (var + 1.e-6)**.5
-
-        y_train = multihot_encoder(y_train, n_categories = 5)
-        y_test = multihot_encoder(y_test, n_categories= 5)
-        dataset_train = torch.utils.data.TensorDataset(torch.tensor(X_train[:, None, :, :]), torch.tensor(y_train))
-        dataset_val = torch.utils.data.TensorDataset(torch.tensor(X_test[:, None, :, :]), torch.tensor(y_test))
-
-
-
+        mean = X_test.mean(dim=-1, keepdim=True)
+        var = X_test.var(dim=-1, keepdim=True)
+        X_test = (X_test - mean) / (var + 1.e-6)**.5
+        dataset_train = torch.utils.data.TensorDataset(torch.tensor(X_train[:, None, :, :]).double(), torch.tensor(y_train).double())
+        dataset_val = torch.utils.data.TensorDataset(torch.tensor(X_test[:, None, :, :]).double(), torch.tensor(y_test).double())
 
     else:
         # dataset_train = build_dataset(is_train=True, args=args)
