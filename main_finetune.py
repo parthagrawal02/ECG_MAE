@@ -184,6 +184,9 @@ def get_args_parser():
                         help='url used to set up distributed training')
     parser.add_argument('--data_split', default=0.8, type= float,
                         help='url used to set up distributed training')
+    parser.add_argument('--task', default='superdiagnostics', type= str,
+                        help='url used to set up distributed training')
+
 
 
     return parser
@@ -311,7 +314,7 @@ def main(args):
 
         sampling_frequency=100
         datafolder=args.data_path
-        task='superdiagnostic'
+        task=args.task
         outputfolder='/output/'
 
         # Load PTB-XL data
