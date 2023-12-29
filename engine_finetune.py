@@ -110,6 +110,8 @@ def evaluate(data_loader, model, device, args):
     criterion = torch.nn.BCEWithLogitsLoss()
 
     metric_logger = misc.MetricLogger(delimiter="  ")
+    auc_meter = misc.SmoothedValue(window_size=1, fmt='{avg:.4f}')
+
     metric_logger.add_meter('auc')  # Add this line
 
     header = 'Test:'

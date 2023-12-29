@@ -131,7 +131,7 @@ def get_args_parser():
     parser.add_argument('--classf_type',type=str, default="multi_label",
                         help='Which Classification')
     parser.add_argument('--mode',type=str, default="finetune",
-                        help='Which Classification')
+                        help='Linear probing or finetuning? "linprobe" or "finetune"')
 
 
 
@@ -184,7 +184,7 @@ def get_args_parser():
                         help='url used to set up distributed training')
     parser.add_argument('--data_split', default=0.8, type= float,
                         help='url used to set up distributed training')
-    parser.add_argument('--task', default='superdiagnostics', type= str,
+    parser.add_argument('--task', default='superdiagnostic', type= str,
                         help='url used to set up distributed training')
 
     return parser
