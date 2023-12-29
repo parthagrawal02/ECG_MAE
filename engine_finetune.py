@@ -110,6 +110,8 @@ def evaluate(data_loader, model, device, args):
     criterion = torch.nn.BCEWithLogitsLoss()
 
     metric_logger = misc.MetricLogger(delimiter="  ")
+    metric_logger.add_meter('auc')  # Add this line
+
     header = 'Test:'
 
     # switch to evaluation mode
@@ -155,6 +157,7 @@ def evaluate(data_loader, model, device, args):
     metric_logger.synchronize_between_processes()
     ml_auroc = MultilabelAUROC(num_labels=args.nb_classes, average="macro", thresholds=None)
     auc = ml_auroc(torch.cat(preds), torch.cat(trues))
+    metric_logger.meters['auc'].update(auc)  # Update the AUC meter
 
     print('* Acc@1 {top1.global_avg:.3f} auc {aucs:.3f} loss {losses.global_avg:.3f}'
           .format(top1=metric_logger.acc1, aucs = auc, losses=metric_logger.loss))

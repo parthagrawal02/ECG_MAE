@@ -131,3 +131,10 @@ def vit_1dcnn(**kwargs):
         patch_size=(1, 50), embed_dim=128, depth=6, num_heads=8,
         mlp_ratio=3, norm_layer=partial(nn.LayerNorm, eps=1e-6), **kwargs)
     return model
+
+def vit_1dcnn_large(**kwargs):
+    model = VisionTransformer1(
+        patch_size=(1, 50), embed_dim=1024, depth=24, num_heads=16,
+        mlp_ratio=4, norm_layer=partial(nn.LayerNorm, eps=1e-6), **kwargs)
+    return model
+
