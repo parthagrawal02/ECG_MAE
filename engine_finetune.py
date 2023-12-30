@@ -112,7 +112,7 @@ def evaluate(data_loader, model, device, args):
     metric_logger = misc.MetricLogger(delimiter="  ")
     auc_meter = misc.SmoothedValue(window_size=1, fmt='{avg:.4f}')
 
-    metric_logger.add_meter('auc')  # Add this line
+    metric_logger.add_meter('auc', auc_meter)  # Add this line
 
     header = 'Test:'
 
