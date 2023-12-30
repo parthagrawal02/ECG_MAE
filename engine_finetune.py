@@ -113,7 +113,7 @@ def evaluate(data_loader, model, device, args):
     auc_meter = misc.SmoothedValue(window_size=1, fmt='{avg:.4f}')
 
     metric_logger.add_meter('auc', auc_meter)  # Add this line
-
+    auc_meter.update(0)
     header = 'Test:'
 
     # switch to evaluation mode
