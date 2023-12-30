@@ -438,6 +438,14 @@ def main(args):
                         **{f'test_{k}': v for k, v in test_stats.items()},
                         'epoch': epoch,
                         'n_parameters': n_parameters}
+        
+        # Convert any tensor objects in log_stats to a list or a number
+        for key in log_stats:
+            if isinstance(log_stats[key], torch.Tensor):
+                if log_stats[key].numel() > 1:
+                    log_stats[key] = log_stats[key].tolist()
+                else:
+                    log_stats[key] = log_stats[key].item()
 
         if args.output_dir and misc.is_main_process():
             if log_writer is not None:
