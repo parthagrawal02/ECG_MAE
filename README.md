@@ -18,7 +18,7 @@ python main_pretrain.py \
 
 ```
 
-data_path to the physionet -
+--data_path to the physionet dataset directory.
 
 Eg. if path to the physionet dataset is
 
@@ -26,17 +26,48 @@ Eg. if path to the physionet dataset is
 
 then --datapath '/Users/parthagrawal02/Desktop/ECG_CNN/physionet'
 
-To Finetune :
+For Finetuning :
 
 ```
 python /kaggle/working/ECG_MAE/main_finetune.py\
+    --mode "finetune"
     --model vit_1dcnn \
     --finetune '/checkpoint-360.pth' \
     --epochs 70 \
     --lr 5e-3 \
-    --data_path /Users/parthagrawal02/Desktop/ECG_CNN/physionet \
+    --data "PTB" \
+    --task "superdiagnostic" \
     --cuda 'CUDA'\
-    --train_start 0 --train_end 46 --data_split 0.85
+    --warmup_epochs 0 \
+    --nb_classes 5 \
+    --classf_type "multi_label"
+
 ```
 
-Modify ecg_dataloader according to the dataset
+Option to select datasets - --data "PTB" for PTB-XL or "physionet" for physionet dataset
+
+If choosing PTB, need to specify --task, and --nb_classes accordingly
+
+For physionet dataset - need to change --classf_type to "multi_class"
+
+For Linear Evaluation
+
+```
+python main_finetune.py\
+    --model vit_1dcnn \
+    --lr 1e-1 \
+    --finetune /kaggle/input/check384-large/checkpoint-384.pth \
+    --data_path /kaggle/input/ptb-xl-dataset/ptb-xl-a-large-publicly-available-electrocardiography-dataset-1.0.1/ \
+    --num_workers 2 \
+    --batch_size 32 \
+    --accum_iter 1 \
+    --cuda "CUDA" \
+    --warmup_epochs 0 \
+    --nb_classes 5 \
+    --epochs 50 \
+    --mode "linprobe" \
+    --data "PTB" \
+    --task "superdiagnostic" \
+    --classf_type "multi_label"
+
+```
