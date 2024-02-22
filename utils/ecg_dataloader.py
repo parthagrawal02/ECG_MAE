@@ -47,6 +47,7 @@ class CustomDataset(Dataset):
         return len(self.data)
     
     def __getitem__(self, idx):
+        
         ecg_path, class_name = self.data[idx]
         ecg_record = wfdb.rdsamp(ecg_path[:-4])
         lx = []
@@ -55,7 +56,7 @@ class CustomDataset(Dataset):
             lx.append(resampled_x)
 
         class_id = self.class_map[class_name]
-        ecg_tensor = torch.from_numpy(np.array(lx))
+        ecg_tensor = torch.from_numpy(np.array(lx).astype(np.float32))
         img_tensor = ecg_tensor[None, :, :]
         mean = img_tensor.mean(dim=-1, keepdim=True)
         var = img_tensor.var(dim=-1, keepdim=True)

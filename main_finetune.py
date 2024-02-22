@@ -332,7 +332,7 @@ def main(args):
         # print(checkpoint_model)
         # interpolate position embedding
         interpolate_pos_embed(model, checkpoint_model)
-
+        
         # load pre-trained model
         msg = model.load_state_dict(checkpoint_model, strict=False)
         print(msg)

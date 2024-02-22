@@ -96,6 +96,7 @@ class VisionTransformer1(nn.Module):
         return imgs
 
     def forward(self, x):
+        # x = x[:, None, :, :]
         # embed patches
         # print("before patch embed = "+str(x.size()))
         x = self.patch_embed(x)
@@ -122,9 +123,7 @@ class VisionTransformer1(nn.Module):
         x = self.head_drop(x)
         return self.head(x)
 
-            
-        return outcome
-
+        
 # Model architecture as described in the paper.
 def vit_1dcnn(**kwargs):
     model = VisionTransformer1(

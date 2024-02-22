@@ -39,7 +39,7 @@ class PatchEmbed(nn.Module):
             flatten: bool = True,
             output_fmt: Optional[str] = None,
             bias: bool = True,
-            strict_img_size: bool = True,
+            strict_img_size: bool = False,
             dynamic_img_pad: bool = False,
     ):
         super().__init__()
@@ -85,6 +85,7 @@ class PatchEmbed(nn.Module):
     
     def forward(self, x):
         B, C, H, W = x.shape
+        print("Size in patch embed {}".format(x.size()))
         if self.img_size is not None:
             if self.strict_img_size:
                 _assert(H == self.img_size[0], f"Input height ({H}) doesn't match model ({self.img_size[0]}).")
@@ -152,11 +153,15 @@ class PatchEmbedWithSize(PatchEmbed):
             _assert(W % self.patch_size[1] == 0, f"Input image width ({W}) must be divisible by patch size ({self.patch_size[1]}).")
 
         x = self.proj(x)
+
+        
         grid_size = x.shape[-2:]
         if self.flatten:
             x = x.flatten(2).transpose(1, 2)  # NCHW -> NLC
+
         elif self.output_fmt != Format.NCHW:
             x = nchw_to(x, self.output_fmt)
+
         x = self.norm(x)
         return x, grid_size
 
