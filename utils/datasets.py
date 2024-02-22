@@ -92,10 +92,14 @@ class CustomDataset(Dataset):
             lx = np.pad(lx, ((0,0), (padding_length - padding_length // 2, padding_length // 2)), 'constant', constant_values=0)
             ecg_tensor = torch.from_numpy(lx)
             # print(ecg_tensor.shape)
+            ecg_tensor = ecg_tensor[None, :, :]
             class_id = self.class_map[class_name]
             class_id = torch.tensor([class_id])
-
+            if torch.isnan(ecg_tensor).any():
+                print("Exception2", idx)
+                return self.__getitem__(idx +  1)
             return ecg_tensor, class_id
+        
         except:
             print("Exception", idx)
             return self.__getitem__(idx +  1)

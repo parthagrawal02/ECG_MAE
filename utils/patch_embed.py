@@ -13,6 +13,7 @@ from typing import Callable, List, Optional, Tuple, Union
 import numpy as np
 import torch
 from torch import nn as nn
+import torchinfo
 import torch.nn.functional as F
 
 from utils.format import Format, nchw_to
@@ -70,22 +71,13 @@ class PatchEmbed(nn.Module):
           nn.Conv1d(32, 64, kernel_size=7, stride=1, bias=bias),
           nn.BatchNorm1d(64),
           nn.ReLU(),
-          nn.Conv1d(64, embed_dim, kernel_size=50, stride=50, padding = 50,dilation= 2, bias=bias),
+          nn.Conv1d(64, embed_dim, kernel_size=self.patch_size[1], stride=self.patch_size[1], padding = self.patch_size[1], dilation = 2),
         )
         self.layer_norm = nn.LayerNorm(embed_dim)
-
-#        self.proj1 = nn.Conv1d(1, 32, kernel_size=15, stride=1,padding= 'same', bias=bias)
-#        self.norm32 = nn.BatchNorm1d(32)
-#        self.proj2 = nn.Conv1d(32, 64, kernel_size=7, stride=1,padding= 'same', bias=bias)
-#        self.norm64 = nn.BatchNorm1d(64)
-#        self.proj = nn.Conv1d(64, embed_dim, kernel_size=50, stride=50, bias=bias)
-#        self.relu = nn.ReLU()
-#        self.layer_norm = nn.LayerNorm(embed_dim)
 
     
     def forward(self, x):
         B, C, H, W = x.shape
-        print("Size in patch embed {}".format(x.size()))
         if self.img_size is not None:
             if self.strict_img_size:
                 _assert(H == self.img_size[0], f"Input height ({H}) doesn't match model ({self.img_size[0]}).")
@@ -103,16 +95,16 @@ class PatchEmbed(nn.Module):
             pad_h = (self.patch_size[0] - H % self.patch_size[0]) % self.patch_size[0]
             pad_w = (self.patch_size[1] - W % self.patch_size[1]) % self.patch_size[1]
             x = F.pad(x, (0, pad_w, 0, pad_h))
-        # print(x.size())
         if self.flatten:
             x = x.flatten(2) # NCHW -> NLC
         
         elif self.output_fmt != Format.NCHW:
             x = nchw_to(x, self.output_fmt)
-        # print(x.size())
+        # summary = torchinfo.summary(self.patch, input_size=(16,  1,  3840))
+        # # Print the summary
+        # print(summary)
         # 3 Convolutional Layers as described in the MAE ECG paper, along with batch normalisations.
         x = self.patch(x).transpose(2, 1)
-        # print(x.size())
         x = self.layer_norm(x)
         return x
 
@@ -154,7 +146,6 @@ class PatchEmbedWithSize(PatchEmbed):
 
         x = self.proj(x)
 
-        
         grid_size = x.shape[-2:]
         if self.flatten:
             x = x.flatten(2).transpose(1, 2)  # NCHW -> NLC

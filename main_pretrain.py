@@ -156,7 +156,7 @@ def main(args):
     model = models_mae.__dict__[args.model](norm_pix_loss=args.norm_pix_loss)
     if args.cuda is not None:
         model.to(device)
-    model = model.double()
+    # model = model.double()
     model.train()
     model_without_ddp = model
     print("Model = %s" % str(model_without_ddp))

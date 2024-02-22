@@ -75,6 +75,7 @@ class MaskedAutoencoderViT(nn.Module):
         # initialization
         # initialize (and freeze) pos_embed by sin-cos embedding
         pos_embed = get_2d_sincos_pos_embed(self.pos_embed.shape[-1], (12, self.patch_embed.num_patches//12), cls_token=True)
+        # print("Pos Embed",pos_embed.size())
         # grid = (height, width). height = 12 here for 12 lead ecg signals
         self.pos_embed.data.copy_(torch.from_numpy(pos_embed).float().unsqueeze(0))
 
@@ -170,9 +171,7 @@ class MaskedAutoencoderViT(nn.Module):
     def forward_encoder(self, x, mask_ratio):
         # embed patches
         # print("before patch embed = "+str(x.size()))
-        x = x[:, None, :, :]
         x = self.patch_embed(x)
-        # print("after patch embed = "+str(x.size()))
         # add pos embed w/o cls token
         x = x + self.pos_embed[:, 1:, :]
 
@@ -226,11 +225,11 @@ class MaskedAutoencoderViT(nn.Module):
         """
         # pred = self.unpatchify(pred)
         target = self.patchify(imgs)
-        if self.norm_pix_loss:
-            mean = target.mean(dim=-1, keepdim=True)
-            var = target.var(dim=-1, keepdim=True)
-            target = (target - mean) / (var + 1.e-6)**.5
-            
+        # if self.norm_pix_loss:
+        #     mean = target.mean(dim=-1, keepdim=True)
+        #     var = target.var(dim=-1, keepdim=True)
+        #     target = (target - mean) / (var + 1.e-6)**.5
+                    
         if torch.isnan(target).any():
             print("NaN values found in target")
         if torch.isnan(pred).any():
