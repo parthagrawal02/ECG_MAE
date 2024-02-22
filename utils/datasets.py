@@ -57,13 +57,12 @@ class CustomDataset(Dataset):
     def __len__(self):
 
         # l3 = 0
-
         # for file_path, _ in self.data:
         #     ecg_signal =  wfdb.rdsamp(file_path[:-4])[0]
         #     resampled_x, _ = wfdb.processing.resample_sig(ecg_signal[:, 0], 500, 250)
         #     _, rpeaks = nk.ecg_peaks(resampled_x, sampling_rate=250, method="neurokit")
         #     l3 += len(rpeaks["ECG_R_Peaks"])
-
+        
         return len(self.data)*8
     
     def __getitem__(self, idx):
@@ -75,7 +74,7 @@ class CustomDataset(Dataset):
             ecg_signal =  wfdb.rdsamp(file_path[:-4])[0]
 
             resampled_x, _ = wfdb.processing.resample_sig(ecg_signal[:, 0], 500, 250)
-            _, rpeaks = nk.ecg_peaks(resampled_x, sampling_rate=500, method="neurokit")
+            _, rpeaks = nk.ecg_peaks(resampled_x, sampling_rate=250, method="neurokit")
             rpeaks["ECG_R_Peaks"] = dropna(rpeaks["ECG_R_Peaks"])
 
             lx = []
@@ -84,7 +83,7 @@ class CustomDataset(Dataset):
                 resampled_x, _ = wfdb.processing.resample_sig(ecg_signal[:, chan], 500, 250)
                 cleaned_ecg = nk.ecg_clean(resampled_x, sampling_rate=250)
                 epochs = nk.ecg_segment(cleaned_ecg, rpeaks["ECG_R_Peaks"], sampling_rate=250)
-                df_with_index_column = np.array(list(epochs.values())[:][segment_idx].reset_index()['index'])
+                df_with_index_column = np.array(list(epochs.values())[:][segment_idx].reset_index()['Signal'])
                 # print(df_with_index_column.shape)
                 lx.append(df_with_index_column)
 
@@ -100,31 +99,3 @@ class CustomDataset(Dataset):
         except:
             print("Exception", idx)
             return self.__getitem__(idx +  1)
-            # file_idx = 0
-            # segment_idx = 1
-            # file_path, class_name = self.data[file_idx]
-            # ecg_signal =  wfdb.rdsamp(file_path[:-4])[0]
-
-            # resampled_x, _ = wfdb.processing.resample_sig(ecg_signal[:, 0], 500, 250)
-            # _, rpeaks = nk.ecg_peaks(resampled_x, sampling_rate=500, method="neurokit")
-            # rpeaks["ECG_R_Peaks"] = dropna(rpeaks["ECG_R_Peaks"])
-
-            # lx = []
-            # n = ecg_signal.shape[1]
-            # for chan in range(n):
-            #     resampled_x, _ = wfdb.processing.resample_sig(ecg_signal[:, chan], 500, 250)
-            #     cleaned_ecg = nk.ecg_clean(resampled_x, sampling_rate=250)
-            #     epochs = nk.ecg_segment(cleaned_ecg, rpeaks["ECG_R_Peaks"], sampling_rate=250)
-            #     df_with_index_column = np.array(list(epochs.values())[:][segment_idx].reset_index()['index'])
-            #     # print(df_with_index_column.shape)
-            #     lx.append(df_with_index_column)
-
-            # lx = np.array(lx).astype(np.float32) 
-            # padding_length = 320 - lx.shape[1]
-            # lx = np.pad(lx, ((0,0), (padding_length - padding_length // 2, padding_length // 2)), 'constant', constant_values=0)
-            # ecg_tensor = torch.from_numpy(lx)
-            # print(ecg_tensor.shape)
-            # class_id = self.class_map[class_name]
-            # class_id = torch.tensor([class_id])
-
-            # return ecg_tensor, class_id
