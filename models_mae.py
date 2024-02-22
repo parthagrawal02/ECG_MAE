@@ -28,7 +28,7 @@ from utils.pos_embed import get_2d_sincos_pos_embed
 class MaskedAutoencoderViT(nn.Module):
     """ Masked Autoencoder with VisionTransformer backbone
     """
-    def __init__(self, img_size=(12, 1000), patch_size=(1, 50), in_chans=1,
+    def __init__(self, img_size=(12, 320), patch_size=(1, 40), in_chans=1,
                  embed_dim=128, depth=6, num_heads=8,
                  decoder_embed_dim=64, decoder_depth=3, decoder_num_heads=8,
                  mlp_ratio=3., norm_layer=nn.LayerNorm, norm_pix_loss=False):
@@ -253,11 +253,19 @@ class MaskedAutoencoderViT(nn.Module):
 
 # Model architecture as described in the paper.
 def mae_vit_1dcnn(**kwargs):
-    model = MaskedAutoencoderViT(
+    model = MaskedAutoencoderViT(img_size= (12, 1000),
         patch_size=(1, 50), embed_dim=128, depth=6, num_heads=8,
         decoder_embed_dim=64, decoder_depth=3, decoder_num_heads=8,
         mlp_ratio=3, norm_layer=partial(nn.LayerNorm, eps=1e-6), **kwargs)
     return model
+
+def mae_vit_1dcnn_segment(**kwargs):
+    model = MaskedAutoencoderViT(img_size=(12, 320),
+        patch_size=(1, 40), embed_dim=128, depth=6, num_heads=8,
+        decoder_embed_dim=64, decoder_depth=3, decoder_num_heads=8,
+        mlp_ratio=3, norm_layer=partial(nn.LayerNorm, eps=1e-6), **kwargs)
+    return model
+
 
 def mae_vit_1dcnn_large(**kwargs):
     model = MaskedAutoencoderViT(
