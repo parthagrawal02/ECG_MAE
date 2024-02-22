@@ -91,7 +91,7 @@ class CustomDataset(Dataset):
             padding_length = 320 - lx.shape[1]
             lx = np.pad(lx, ((0,0), (padding_length - padding_length // 2, padding_length // 2)), 'constant', constant_values=0)
             ecg_tensor = torch.from_numpy(lx)
-            print(ecg_tensor.shape)
+            # print(ecg_tensor.shape)
             class_id = self.class_map[class_name]
             class_id = torch.tensor([class_id])
 
