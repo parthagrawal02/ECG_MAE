@@ -9,21 +9,15 @@ import pdb
 import neurokit2 as nk
 import pandas as pd
 import h5py
+import h5pickle
 
 class CustomDataset(Dataset):
     def __init__(self, data_path: str = ""):
-        self.data_path = data_path
-        h5_file = h5py.File(self.data_path , 'r')
-        self.data = list(h5_file.keys())
+        self.file = h5pickle.File(data_path, 'r',skip_cache=False)
+        self.data = self.file['merged_dataset']
 
     def __len__(self):
         return len(self.data)
     
     def __getitem__(self, idx):
-
-        key = self.data[idx]
-        h5_file = h5py.File(self.data_path , 'r')
-        img = torch.from_numpy(np.array(h5_file[key]))
-        if torch.isnan(img).any():
-            return self.__getitem__(idx +  1)
-        return img, torch.tensor(idx)
+        return np.array(self.data[idx])[None,:,:], np.array(idx)
