@@ -23,4 +23,7 @@ class CustomDataset(Dataset):
 
         key = self.data[idx]
         h5_file = h5py.File(self.data_path , 'r')
-        return torch.from_numpy(np.array(h5_file[key])), torch.tensor(idx)
+        img = torch.from_numpy(np.array(h5_file[key]))
+        if torch.isnan(img).any():
+            return self.__getitem__(idx +  1)
+        return img, torch.tensor(idx)

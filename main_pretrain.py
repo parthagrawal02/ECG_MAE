@@ -36,7 +36,7 @@ import timm.optim.optim_factory as optim_factory
 import utils.misc as misc
 from utils.misc import NativeScalerWithGradNormCount as NativeScaler
 # from utils.ecg_dataloader import CustomDataset
-from utils.datasets import CustomDataset
+from utils.datasets_h5 import CustomDataset
 import models_mae
 from torchsummary import summary
 
@@ -135,7 +135,7 @@ def main(args):
         
     # Physionet Dataset  - change range n from (1, 46) to the number of folders you need
     # Custom Dataloader, arguments - data_path, start file and end file (from the 46 folders)
-    dataset = CustomDataset(args.data_path, args.start, args.end)
+    dataset = CustomDataset(args.data_path)
     sampler_train = torch.utils.data.RandomSampler(dataset)
     
     if args.log_dir is not None:
