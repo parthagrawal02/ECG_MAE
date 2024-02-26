@@ -15,9 +15,10 @@ class CustomDataset(Dataset):
     def __init__(self, data_path: str = ""):
         self.file = h5pickle.File(data_path, 'r',skip_cache=False)
         self.data = self.file['signals']
+        self.signals = self.data[:]
 
     def __len__(self):
         return len(self.data)
     
     def __getitem__(self, idx):
-        return np.array(self.data[idx])[None,:,:], np.array(idx)
+        return np.array(self.signals[idx])[None,:,:], np.array(idx)

@@ -185,10 +185,6 @@ def main(args):
     print(f"Start training for {args.epochs} epochs")
     start_time = time.time()
 
-#    if args.resume != '':
-#        checkpoint = torch.load("output_dir/checkpoint-" + str(args.start_epoch) + ".pth")
-#        model.load_state_dict(checkpoint['model'])
-#        epoch = checkpoint['epoch']
 
     for epoch in range(args.start_epoch, args.epochs):
         train_stats = train_one_epoch(
