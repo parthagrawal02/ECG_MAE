@@ -14,7 +14,7 @@ import h5pickle
 class CustomDataset(Dataset):
     def __init__(self, data_path: str = ""):
         self.file = h5pickle.File(data_path, 'r',skip_cache=False)
-        self.data = self.file['merged_dataset']
+        self.data = self.file['signals']
 
     def __len__(self):
         return len(self.data)
